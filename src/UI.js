@@ -1,19 +1,43 @@
 // aguacero-api/src/UI.js
 
 export class RunSelectorPanel {
-    constructor(manager) {
+    /**
+     * Creates an instance of RunSelectorPanel.
+     * @param {FillLayerManager} manager - The main controller instance.
+     * @param {object} [options={}] - Customization options.
+     * @param {string} [options.label] - Custom text for the panel's label.
+     * @param {function(string, string): string} [options.runFormatter] - A function to format the display text in the dropdown.
+     */
+    constructor(manager, options = {}) {
         this.manager = manager;
         this.element = null;
         this.selectElement = null;
+        
+        // Use provided options or fall back to defaults
+        this.options = {
+            label: options.label || `Model Run (${this.manager.state.model.toUpperCase()})`,
+            runFormatter: options.runFormatter || this._defaultFormatRunDisplay
+        };
     }
 
-    _formatRunDisplay(date, run) {
+    /**
+     * The default formatter for displaying date/run combinations.
+     * @param {string} date - Date in YYYYMMDD format.
+     * @param {string} run - Run hour in HH format.
+     * @returns {string} - Formatted string like "2025-09-28 (18Z)".
+     * @private
+     */
+    _defaultFormatRunDisplay(date, run) {
         const year = date.substring(0, 4);
         const month = date.substring(4, 6);
         const day = date.substring(6, 8);
         return `${year}-${month}-${day} (${run}Z)`;
     }
 
+    /**
+     * Populates the select dropdown with available runs from the manager's state.
+     * @private
+     */
     _populate() {
         const modelStatus = this.manager.modelStatus;
         const modelName = this.manager.state.model;
@@ -42,7 +66,7 @@ export class RunSelectorPanel {
         allRuns.forEach(({ date, run }) => {
             const option = document.createElement('option');
             option.value = `${date}:${run}`;
-            option.textContent = this._formatRunDisplay(date, run);
+            option.textContent = this.options.runFormatter(date, run);
             this.selectElement.appendChild(option);
         });
         
@@ -50,21 +74,26 @@ export class RunSelectorPanel {
         this.selectElement.disabled = false;
     }
 
+    /**
+     * Renders the panel and appends it to a target DOM element.
+     * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
+     * @returns {this} The instance for chaining.
+     */
     addTo(target) {
         const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
-
-        // ADD THIS CHECK:
         if (!targetElement) {
             throw new Error(`AguaceroAPI Error: The target element "${target}" for RunSelectorPanel could not be found in the DOM.`);
         }
-        
+
         this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-run-selector';
+
         this.element.innerHTML = `
-            <label for="run-selector-api">Model Run (${this.manager.state.model.toUpperCase()})</label>
-            <select id="run-selector-api" disabled><option>Loading...</option></select>
+            <label class="aguacero-panel-label">${this.options.label}</label>
+            <select class="aguacero-panel-select" disabled><option>Loading...</option></select>
         `;
         this.selectElement = this.element.querySelector('select');
-        
+
         this.selectElement.addEventListener('change', (e) => {
             const [date, run] = e.target.value.split(':');
             this.manager.setState({ date, run, forecastHour: 0 });
@@ -78,13 +107,27 @@ export class RunSelectorPanel {
 }
 
 export class ForecastSliderPanel {
-    constructor(manager) {
+    /**
+     * Creates an instance of ForecastSliderPanel.
+     * @param {FillLayerManager} manager - The main controller instance.
+     * @param {object} [options={}] - Customization options.
+     * @param {string} [options.label] - Custom text for the panel's label.
+     */
+    constructor(manager, options = {}) {
         this.manager = manager;
         this.element = null;
         this.sliderElement = null;
         this.displayElement = null;
+
+        this.options = {
+            label: options.label || 'Forecast Hour'
+        };
     }
 
+    /**
+     * Updates the slider's range and value based on the manager's current state.
+     * @private
+     */
     _update() {
         const { model, date, run, forecastHour } = this.manager.state;
         const forecastHours = this.manager.modelStatus?.[model]?.[date]?.[run];
@@ -103,18 +146,23 @@ export class ForecastSliderPanel {
         this.sliderElement.disabled = false;
     }
 
+    /**
+     * Renders the panel and appends it to a target DOM element.
+     * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
+     * @returns {this} The instance for chaining.
+     */
     addTo(target) {
         const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
-
-        // ADD THIS CHECK:
         if (!targetElement) {
             throw new Error(`AguaceroAPI Error: The target element "${target}" for ForecastSliderPanel could not be found in the DOM.`);
         }
 
         this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-slider';
+        
         this.element.innerHTML = `
-            <label for="hour-slider-api">Forecast Hour: +<span>0</span>hr</label>
-            <input type="range" id="hour-slider-api" min="0" max="0" value="0" step="1" disabled>
+            <label class="aguacero-panel-label">${this.options.label}: +<span class="aguacero-slider-display">0</span>hr</label>
+            <input type="range" class="aguacero-slider-input" min="0" max="0" value="0" step="1" disabled>
         `;
         this.sliderElement = this.element.querySelector('input');
         this.displayElement = this.element.querySelector('span');

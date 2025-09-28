@@ -2,13 +2,17 @@
 
 import { EventEmitter } from './events.js';
 import { GridRenderLayer } from './GridRenderLayer.js';
-// Import the model configurations from the separate file
 import { COORDINATE_CONFIGS } from './coordinate_configs.js';
 
-
-// Internal helper function, not exported
+/**
+ * Finds the latest available date and run for a specific model from the model status data.
+ * @param {object} modelsData - The 'models' object from the model-status API response.
+ * @param {string} modelName - The name of the model (e.g., 'gfs').
+ * @returns {{date: string, run: string}|null} - The latest date and run, or null if not found.
+ * @private
+ */
 function findLatestModelRun(modelsData, modelName) {
-    const model = modelsData[modelName];
+    const model = modelsData?.[modelName];
     if (!model) return null;
     const availableDates = Object.keys(model).sort((a, b) => b.localeCompare(a));
     for (const date of availableDates) {
@@ -21,16 +25,32 @@ function findLatestModelRun(modelsData, modelName) {
 }
 
 export class FillLayerManager extends EventEmitter {
+    /**
+     * Creates an instance of FillLayerManager.
+     * @param {mapboxgl.Map} map - The Mapbox GL map instance.
+     * @param {object} [options={}] - Configuration options.
+     * @param {string} [options.id='weather-layer'] - A unique ID for the map layer.
+     * @param {object} [options.layerOptions] - Base options for the weather layer (model, variable, etc.).
+     * @param {'on-demand'|'preload'} [options.loadStrategy='on-demand'] - The data loading strategy.
+     */
     constructor(map, options = {}) {
         super();
         if (!map) throw new Error('A Mapbox GL map instance is required.');
+
         this.map = map;
         this.layers = new Map();
         this.baseUrl = 'https://d3dc62msmxkrd7.cloudfront.net/grids';
         this.worker = this.createWorker();
-        
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
+        
+        // Caching and Loading Strategy
+        this.cache = new Map();
+        this.loadStrategy = options.loadStrategy || 'on-demand';
+        if (!['on-demand', 'preload'].includes(this.loadStrategy)) {
+            throw new Error(`Invalid loadStrategy: "${this.loadStrategy}". Must be 'on-demand' or 'preload'.`);
+        }
+
         this.layerId = options.id || 'weather-layer';
         this.baseLayerOptions = options.layerOptions || {};
         
@@ -45,23 +65,11 @@ export class FillLayerManager extends EventEmitter {
         this.autoRefreshInterval = null;
     }
 
-    async fetchModelStatus(force = false) {
-        if (!this.modelStatus || force) {
-            if (force) console.log("Forcing model status refresh...");
-            try {
-                const response = await fetch(this.statusUrl);
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                this.modelStatus = (await response.json()).models;
-            } catch (error) {
-                console.error("Could not load model status:", error);
-                this.modelStatus = null;
-            }
-        }
-        return this.modelStatus;
-    }
-
+    /**
+     * Creates the data decompression web worker.
+     * @private
+     */
     createWorker() {
-        // ... (This function is exactly the same as in your provided file)
         const workerCode = `
             import { decompress } from 'https://cdn.skypack.dev/fzstd@0.1.1';
             self.onmessage = async (e) => {
@@ -89,31 +97,29 @@ export class FillLayerManager extends EventEmitter {
         return new Worker(URL.createObjectURL(blob), { type: 'module' });
     }
 
-    async setState(newState) {
-        const oldState = { ...this.state };
-        Object.assign(this.state, newState);
-
-        const dataChanged = oldState.date !== this.state.date ||
-                              oldState.run !== this.state.run ||
-                              oldState.forecastHour !== this.state.forecastHour;
-
-        if (dataChanged) {
-            this.removeLayer(this.layerId);
-            if (this.state.date && this.state.run) {
-                const fullOptions = { ...this.baseLayerOptions, ...this.state };
-                await this.addLayer(this.layerId, fullOptions);
+    /**
+     * Fetches and caches the model status data.
+     * @param {boolean} [force=false] - If true, bypasses the cache and fetches fresh data.
+     */
+    async fetchModelStatus(force = false) {
+        if (!this.modelStatus || force) {
+            if (force) console.log("Forcing model status refresh...");
+            try {
+                const response = await fetch(this.statusUrl);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                this.modelStatus = (await response.json()).models;
+            } catch (error) {
+                console.error("Could not load model status:", error);
+                this.modelStatus = null;
             }
         }
-        
-        this.emit('state:change', this.state);
+        return this.modelStatus;
     }
 
-    async initialize() {
-        const modelStatus = await this.fetchModelStatus();
-        const latestRun = findLatestModelRun(modelStatus, this.state.model);
-        await this.setState({ ...latestRun, forecastHour: 0 });
-    }
-
+    /**
+     * Starts an interval to automatically refresh the model status data.
+     * @param {number} [intervalMinutes=1] - The refresh interval in minutes.
+     */
     startAutoRefresh(intervalMinutes = 1) {
         this.stopAutoRefresh();
         this.autoRefreshInterval = setInterval(async () => {
@@ -122,6 +128,9 @@ export class FillLayerManager extends EventEmitter {
         }, intervalMinutes * 60 * 1000);
     }
 
+    /**
+     * Stops the automatic refresh interval.
+     */
     stopAutoRefresh() {
         if (this.autoRefreshInterval) {
             clearInterval(this.autoRefreshInterval);
@@ -129,85 +138,145 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-    async addLayer(id, options) {
-        const { model, date, run, forecastHour, variable, smoothing, colormap, opacity = 1, visible = true } = options;
-        const gridConfig = COORDINATE_CONFIGS[model];
-        if (!gridConfig) throw new Error(`Model "${model}" not found.`);
-        
-        const grid = gridConfig.grid_params;
+    /**
+     * Generates a unique cache key for a given set of parameters.
+     * @private
+     */
+    _getCacheKey(state) {
+        const { model, date, run, forecastHour, variable } = { ...this.baseLayerOptions, ...state };
+        return `${model}-${date}-${run}-${forecastHour}-${variable}`;
+    }
+
+    /**
+     * Loads grid data from the cache or fetches it from the network.
+     * @private
+     * @returns {Promise<Uint8Array|null>} The decompressed grid data.
+     */
+    async _loadGridData(state) {
+        const cacheKey = this._getCacheKey(state);
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey); // Cache now returns { data, encoding }
+        }
+
+        const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
         const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
-        const shaderLayer = new GridRenderLayer(id);
-        
-        this.map.addLayer(shaderLayer);
-        this.layers.set(id, { id, shaderLayer, options, visible });
 
         try {
             const response = await fetch(dataUrl);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            // Capture the encoding provided by the API for this specific grid
             const { data: b64Data, encoding } = await response.json();
             const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
-            
-            const handleWorkerMessage = (e) => {
-                this.worker.removeEventListener('message', handleWorkerMessage);
-                if (e.data.success) {
-                    const { decompressedData } = e.data;
-                    shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
-                    shaderLayer.updateColormapTexture(colormap);
-                    const dataRange = [colormap[0], colormap[colormap.length - 2]];
-                    shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
-                    this.map.triggerRepaint();
-                } else {
-                    console.error("Worker failed:", e.data.error);
-                }
-            };
-            this.worker.addEventListener('message', handleWorkerMessage);
-            this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]);
+
+            return new Promise((resolve) => {
+                const handleWorkerMessage = (e) => {
+                    this.worker.removeEventListener('message', handleWorkerMessage);
+                    if (e.data.success) {
+                        // Create a result object that includes the network encoding
+                        const result = {
+                            data: e.data.decompressedData,
+                            encoding: encoding 
+                        };
+                        this.cache.set(cacheKey, result); // Cache the complete result
+                        resolve(result);
+                    } else {
+                        console.error("Worker failed:", e.data.error);
+                        resolve(null);
+                    }
+                };
+                this.worker.addEventListener('message', handleWorkerMessage);
+                // Pass the encoding to the worker (it doesn't use it, but this is good practice)
+                this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]);
+            });
         } catch (error) {
-            console.error(`Failed to load data for layer "${id}":`, error);
-            this.removeLayer(id);
+            console.error(`Failed to fetch data for ${cacheKey}:`, error);
+            return null;
         }
     }
 
-  updateLayer(id, options) {
-    const layerState = this.layers.get(id);
-    if (!layerState) return;
-    const { shaderLayer } = layerState;
-    if (options.colormap) {
-      shaderLayer.updateColormapTexture(options.colormap);
-      layerState.options.colormap = options.colormap;
-    }
-    if (options.opacity !== undefined) {
-      layerState.options.opacity = options.opacity;
-      if (layerState.visible) {
-        shaderLayer.updateStyle({ opacity: options.opacity });
-      }
-    }
-    // Note: To update the data (e.g., change the forecast hour), you should remove the layer and add a new one.
-    this.map.triggerRepaint();
-  }
-
-  setVisible(id, visible) {
-    const layerState = this.layers.get(id);
-    if (!layerState) return;
-    layerState.visible = visible;
-    const newOpacity = visible ? layerState.options.opacity : 0;
-    layerState.shaderLayer.updateStyle({ opacity: newOpacity });
-    this.map.triggerRepaint();
-  }
-
-removeLayer(id) {
-    if (this.layers.has(id)) {
-        if (this.map.getLayer(id)) this.map.removeLayer(id);
-        this.layers.delete(id);
-    }
-}
-
-  destroy() {
-    // Terminate the worker to free up resources
-    if (this.worker) this.worker.terminate();
-    // Remove all layers managed by this instance
-    for (const id of this.layers.keys()) {
+    /**
+     * Renders a grid layer on the map using the provided data.
+     * @private
+     */
+    _renderLayer(id, options, decompressedData, encoding) {
         this.removeLayer(id);
+
+        const { model, colormap, opacity = 1, visible = true } = options;
+        const gridConfig = COORDINATE_CONFIGS[model];
+        if (!gridConfig) {
+            console.error(`No grid configuration found for model: ${model}`);
+            return;
+        }
+        const grid = gridConfig.grid_params;
+        
+        const shaderLayer = new GridRenderLayer(id);
+        this.map.addLayer(shaderLayer);
+        this.layers.set(id, { id, shaderLayer, options, visible });
+
+        // Use the encoding that was passed in, which came from the network
+        shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
+        shaderLayer.updateColormapTexture(colormap);
+        const dataRange = [colormap[0], colormap[colormap.length - 2]];
+        shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
+        this.map.triggerRepaint();
     }
-  }
+    
+    /**
+     * Updates the manager's state, triggers data loading and rendering.
+     * @param {object} newState - The new state properties to apply.
+     */
+    async setState(newState) {
+        const oldState = { ...this.state };
+        Object.assign(this.state, newState);
+
+        const runChanged = oldState.date !== this.state.date || oldState.run !== this.state.run;
+
+        if (runChanged && this.loadStrategy === 'preload') {
+            console.log(`Preloading all forecast hours for ${this.state.date}/${this.state.run}Z...`);
+            const forecastHours = this.modelStatus?.[this.state.model]?.[this.state.date]?.[this.state.run] || [];
+            
+            Promise.all(forecastHours.map(hour => {
+                const stateForHour = { ...this.state, forecastHour: hour };
+                return this._loadGridData(stateForHour);
+            }));
+        }
+
+        const grid = await this._loadGridData(this.state);
+        
+        if (grid && grid.data) {
+            const fullOptions = { ...this.baseLayerOptions, ...this.state };
+            // Pass both the data and the encoding to the renderer
+            this._renderLayer(this.layerId, fullOptions, grid.data, grid.encoding);
+        } else {
+            this.removeLayer(this.layerId);
+        }
+        
+        this.emit('state:change', this.state);
+    }
+    
+    /**
+     * Initializes the manager by fetching the latest model run and rendering the first frame.
+     */
+    async initialize() {
+        const modelStatus = await this.fetchModelStatus();
+        const latestRun = findLatestModelRun(modelStatus, this.state.model);
+        if (latestRun) {
+            await this.setState({ ...latestRun, forecastHour: 0 });
+        } else {
+            console.error(`Could not initialize. No runs found for model "${this.state.model}".`);
+            this.emit('state:change', this.state); // Emit to render empty UI state
+        }
+    }
+
+    /**
+     * Removes a layer from the map.
+     * @param {string} id - The ID of the layer to remove.
+     */
+    removeLayer(id) {
+        if (this.layers.has(id)) {
+            if (this.map.getLayer(id)) this.map.removeLayer(id);
+            this.layers.delete(id);
+        }
+    }
 }
