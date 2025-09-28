@@ -4,27 +4,33 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
-    // Tell Vite we are building a library
+    // This part tells Vite we are building a library
     lib: {
-      entry: resolve(__dirname, 'src/fillLayerManager.js'),
+      // CHANGE #1: The entry point is now our new `index.js` file,
+      // which exports everything we want to make public.
+      entry: resolve(__dirname, 'src/index.js'),
+      
+      // The name for the global variable in UMD builds (good for CDN usage)
       name: 'AguaceroAPI',
-      // We are only building an ES Module
-      formats: ['es'],
+
+      // The base name for the output files. Vite will add extensions.
+      // e.g., aguacero-api.js and aguacero-api.umd.cjs
+      fileName: 'aguacero-api',
+      
+      // We will build both an ES module and a UMD module for max compatibility.
+      formats: ['es', 'umd'],
     },
+    // CHANGE #2: We remove the old `rollupOptions`.
+    // The `preserveModules: true` option was preventing bundling.
+    // By removing it, Vite will now correctly bundle everything into single files.
     rollupOptions: {
-      output: {
-        // Preserve the folder structure
-        preserveModules: true,
-        // Define the root of that structure
-        preserveModulesRoot: 'src',
-        // Define the output directory
-        dir: 'dist',
-        // Define the naming pattern for entry files
-        entryFileNames: '[name].js',
-      },
+      // We can optionally make peer dependencies external so they aren't
+      // bundled into our library. This is good practice.
+      // external: ['mapbox-gl'],
     },
   },
-  // Add worker configuration
+  // Your worker configuration can remain the same. It is not related to the
+  // library build and should continue to work as expected.
   worker: {
     format: 'es',
     rollupOptions: {

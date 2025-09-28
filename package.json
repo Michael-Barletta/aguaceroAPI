@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "A custom Mapbox GL fill layer manager.",
   "type": "module",
-  "main": "./dist/fillLayerManager.js",
-  "module": "./dist/fillLayerManager.js",
+  "main": "./dist/aguacero-api.umd.cjs",
+  "module": "./dist/aguacero-api.js",
   "exports": {
-    ".": "./dist/fillLayerManager.js"
+    ".": {
+      "import": "./dist/aguacero-api.js",
+      "require": "./dist/aguacero-api.umd.cjs"
+    }
   },
   "files": [
     "dist"
