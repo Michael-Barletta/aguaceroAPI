@@ -1,0 +1,24 @@
+{
+  "name": "aguacero-api",
+  "version": "1.0.0",
+  "description": "A custom Mapbox GL fill layer manager.",
+  "type": "module",
+  "main": "./dist/fillLayerManager.js",
+  "module": "./dist/fillLayerManager.js",
+  "exports": {
+    ".": "./dist/fillLayerManager.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "fzstd": "^0.1.1"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
