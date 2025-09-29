@@ -10,7 +10,10 @@ import {
     ForecastSliderPanel, 
     ThemeControlPanel,
     LabelControlPanel,
-    UnitControlPanel
+    UnitControlPanel,
+    LegendPanel,
+    ModelSelectorPanel,
+    LayerControlPanel,
 } from './UI.js';
 
 // Re-export them from this single file.
@@ -21,5 +24,8 @@ export {
     ForecastSliderPanel,
     ThemeControlPanel,
     LabelControlPanel,
-    UnitControlPanel
+    UnitControlPanel,
+    LegendPanel,
+    ModelSelectorPanel,
+    LayerControlPanel,
 };

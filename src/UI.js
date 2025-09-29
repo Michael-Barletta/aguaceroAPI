@@ -1,32 +1,20 @@
 // aguacero-api/src/UI.js
 import { THEME_CONFIGS } from './map-styles.js';
+import { getUnitConversionFunction } from './unitConversions.js';
+import { MODEL_CONFIGS, DICTIONARIES } from './model-definitions.js';
 export class RunSelectorPanel {
-    /**
-     * Creates an instance of RunSelectorPanel.
-     * @param {FillLayerManager} manager - The main controller instance.
-     * @param {object} [options={}] - Customization options.
-     * @param {string} [options.label] - Custom text for the panel's label.
-     * @param {function(string, string): string} [options.runFormatter] - A function to format the display text in the dropdown.
-     */
     constructor(manager, options = {}) {
         this.manager = manager;
         this.element = null;
         this.selectElement = null;
+        this.labelElement = null; // Property to hold the label element
         
-        // Use provided options or fall back to defaults
         this.options = {
-            label: options.label || `Model Run (${this.manager.state.model.toUpperCase()})`,
+            label: options.label || `Model Run`,
             runFormatter: options.runFormatter || this._defaultFormatRunDisplay
         };
     }
 
-    /**
-     * The default formatter for displaying date/run combinations.
-     * @param {string} date - Date in YYYYMMDD format.
-     * @param {string} run - Run hour in HH format.
-     * @returns {string} - Formatted string like "2025-09-28 (18Z)".
-     * @private
-     */
     _defaultFormatRunDisplay(date, run) {
         const year = date.substring(0, 4);
         const month = date.substring(4, 6);
@@ -34,26 +22,23 @@ export class RunSelectorPanel {
         return `${year}-${month}-${day} (${run}Z)`;
     }
 
-    /**
-     * Populates the select dropdown with available runs from the manager's state.
-     * @private
-     */
     _populate() {
+        // This method works as-is, since it reads the current model from the manager's state.
         const modelStatus = this.manager.modelStatus;
-        const modelName = this.manager.state.model;
+        const { model, date, run } = this.manager.state;
         if (!modelStatus || !this.selectElement) return;
 
-        const model = modelStatus[modelName];
-        if (!model) {
+        const modelData = modelStatus[model];
+        if (!modelData) {
             this.selectElement.innerHTML = `<option>Model offline</option>`;
             this.selectElement.disabled = true;
             return;
         }
 
         const allRuns = [];
-        for (const date in model) {
-            for (const run in model[date]) {
-                allRuns.push({ date, run });
+        for (const dateKey in modelData) {
+            for (const runKey in modelData[dateKey]) {
+                allRuns.push({ date: dateKey, run: runKey });
             }
         }
         allRuns.sort((a, b) => {
@@ -70,28 +55,32 @@ export class RunSelectorPanel {
             this.selectElement.appendChild(option);
         });
         
-        this.selectElement.value = `${this.manager.state.date}:${this.manager.state.run}`;
+        this.selectElement.value = `${date}:${run}`;
         this.selectElement.disabled = false;
     }
 
     /**
-     * Renders the panel and appends it to a target DOM element.
-     * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
-     * @returns {this} The instance for chaining.
+     * NEW: Updates the panel's label with the current model name.
+     * @private
      */
+    _updateLabel() {
+        if (!this.labelElement) return;
+        this.labelElement.textContent = `${this.options.label} (${this.manager.state.model.toUpperCase()})`;
+    }
+
     addTo(target) {
         const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
         if (!targetElement) {
-            throw new Error(`AguaceroAPI Error: The target element "${target}" for RunSelectorPanel could not be found in the DOM.`);
+            throw new Error(`AguaceroAPI Error: The target element "${target}" for RunSelectorPanel could not be found.`);
         }
 
         this.element = document.createElement('div');
         this.element.className = 'aguacero-panel aguacero-run-selector';
-
         this.element.innerHTML = `
-            <label class="aguacero-panel-label">${this.options.label}</label>
+            <label class="aguacero-panel-label"></label>
             <select class="aguacero-panel-select" disabled><option>Loading...</option></select>
         `;
+        this.labelElement = this.element.querySelector('label');
         this.selectElement = this.element.querySelector('select');
 
         this.selectElement.addEventListener('change', (e) => {
@@ -99,8 +88,82 @@ export class RunSelectorPanel {
             this.manager.setState({ date, run, forecastHour: 0 });
         });
 
-        this.manager.on('state:change', () => this._populate());
+        // On every state change, re-populate runs and update the label
+        this.manager.on('state:change', () => {
+            this._populate();
+            this._updateLabel();
+        });
         
+        targetElement.appendChild(this.element);
+        this._updateLabel(); // Set the initial label text
+        return this;
+    }
+}
+
+export class ModelSelectorPanel {
+    /**
+     * Creates an instance of ModelSelectorPanel.
+     * @param {FillLayerManager} manager - The main controller instance.
+     * @param {object} [options={}] - Customization options.
+     * @param {string} [options.label] - Custom text for the panel's label.
+     */
+    constructor(manager, options = {}) {
+        this.manager = manager;
+        this.element = null;
+        this.selectElement = null;
+        this.options = {
+            label: options.label || 'Weather Model',
+        };
+    }
+
+    /**
+     * Populates the select dropdown with available models from the manager's status.
+     * @private
+     */
+    _populate() {
+        const modelStatus = this.manager.modelStatus;
+        if (!modelStatus || !this.selectElement) return;
+
+        const availableModels = Object.keys(modelStatus).sort();
+        const currentModel = this.manager.state.model;
+
+        this.selectElement.innerHTML = '';
+        availableModels.forEach(modelName => {
+            const option = document.createElement('option');
+            option.value = modelName;
+            option.textContent = modelName.toUpperCase();
+            this.selectElement.appendChild(option);
+        });
+
+        this.selectElement.value = currentModel;
+        this.selectElement.disabled = false;
+    }
+
+    /**
+     * Renders the panel and appends it to a target DOM element.
+     * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
+     */
+    addTo(target) {
+        const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
+        if (!targetElement) {
+            throw new Error(`AguaceroAPI Error: The target element "${target}" for ModelSelectorPanel could not be found.`);
+        }
+
+        this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-model-selector';
+        this.element.innerHTML = `
+            <label class="aguacero-panel-label">${this.options.label}</label>
+            <select class="aguacero-panel-select" disabled><option>Loading...</option></select>
+        `;
+        this.selectElement = this.element.querySelector('select');
+
+        this.selectElement.addEventListener('change', (e) => {
+            this.manager.setModel(e.target.value);
+        });
+
+        // Populate the list when the state changes (ensures modelStatus is loaded).
+        this.manager.on('state:change', () => this._populate());
+
         targetElement.appendChild(this.element);
         return this;
     }
@@ -315,15 +378,23 @@ export class UnitControlPanel {
     /**
      * Creates an instance of UnitControlPanel.
      * @param {FillLayerManager} manager - The main controller instance.
-     * @param {object} [options={}] - Customization options.
-     * @param {'imperial'|'metric'} [options.initialUnit='imperial'] - The unit system to start with.
      */
-    constructor(manager, options = {}) {
+    constructor(manager) {
         this.manager = manager;
         this.element = null;
-        this.options = {
-            initialUnit: options.initialUnit || 'imperial',
-        };
+        this.buttons = null;
+    }
+
+    /**
+     * A helper method to update the active state of the buttons.
+     * @param {string} activeUnit - The unit system that should be marked as active.
+     * @private
+     */
+    _updateButtons(activeUnit) {
+        if (!this.buttons) return;
+        this.buttons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.unit === activeUnit);
+        });
     }
 
     /**
@@ -351,22 +422,284 @@ export class UnitControlPanel {
         this.buttons.forEach(button => {
             button.addEventListener('click', (e) => {
                 const newUnit = e.target.dataset.unit;
-                // Call the new setUnits method on the FillLayerManager
                 this.manager.setUnits(newUnit);
             });
         });
 
-        // Listen for state changes to update which button is active
+        // Listen for state changes from the manager to keep buttons in sync.
         this.manager.on('state:change', ({ units }) => {
-            this.buttons.forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.unit === units);
+            this._updateButtons(units);
+        });
+
+        targetElement.appendChild(this.element);
+
+        // --- THIS IS THE CHANGE ---
+        // The panel no longer sets the state. Instead, it reads the manager's
+        // current state to set its own initial appearance.
+        this._updateButtons(this.manager.state.units);
+
+        return this;
+    }
+}
+
+export class LegendPanel {
+    /**
+     * Creates an instance of LegendPanel.
+     * @param {FillLayerManager} manager - The main controller instance.
+     * @param {object} [options={}] - Customization options for the legend.
+     * @param {string} [options.title='Legend'] - The title displayed at the top of the legend.
+     * @param {{imperial: string, metric: string}} [options.units] - The unit labels to display (e.g., { imperial: '°F', metric: '°C' }).
+     * @param {number} [options.stops=10] - The approximate number of discrete color stops to show in the legend.
+     * @param {'top-left'|'top-right'|'bottom-left'|'bottom-right'} [options.position='bottom-right'] - The position of the legend on the map.
+     * @param {function(number): string} [options.labelFormatter] - A function to format the numeric labels.
+     */
+    constructor(manager, options = {}) {
+        this.manager = manager;
+        this.element = null;
+
+        // Merge user-provided options with sensible defaults
+        this.options = {
+            title: options.title || 'Legend',
+            units: options.units || { imperial: '', metric: '' },
+            stops: options.stops || 10,
+            position: options.position || 'bottom-right',
+            labelFormatter: options.labelFormatter || ((value) => Math.round(value)),
+        };
+    }
+
+    /**
+     * Renders the legend panel and adds it to the map container.
+     * @param {mapboxgl.Map} map - The Mapbox GL map instance.
+     * @returns {this} The instance for chaining.
+     */
+    addTo(map) {
+        const mapContainer = map.getContainer();
+        if (!mapContainer) {
+            throw new Error('AguaceroAPI Error: The map container for the LegendPanel could not be found.');
+        }
+
+        this.element = document.createElement('div');
+        this.element.className = `aguacero-legend-panel aguacero-legend-${this.options.position}`;
+        
+        mapContainer.appendChild(this.element);
+
+        // Listen for state changes to automatically update the legend
+        this.manager.on('state:change', (state) => this._update(state));
+        
+        // Perform an initial render
+        this._update(this.manager.state);
+
+        return this;
+    }
+
+    /**
+     * Re-renders the legend's content based on the current state.
+     * @param {object} state - The current state from the FillLayerManager.
+     * @private
+     */
+    _update(state) {
+        if (!this.element) return;
+
+        const { colormap, colormapBaseUnit } = this.manager.baseLayerOptions;
+        
+        // Add this log to see what colormap the legend is trying to render
+        console.log(`[Legend._update] Receiving data for variable "${state.variable}". The colormap it will render is:`, JSON.parse(JSON.stringify(colormap)));
+
+        const variableInfo = DICTIONARIES.fld[state.variable] || {};
+        const legendTitle = variableInfo.variable || 'Legend';
+        const { units } = state;
+        const unitLabel = Object.keys(variableInfo.units || {})[0] || '';
+        const stopsHtml = this._generateStopsHtml(colormap, colormapBaseUnit, units);
+
+        this.element.innerHTML = `
+            <h3 class="aguacero-legend-title">${legendTitle} (${unitLabel})</h3>
+            <div class="aguacero-legend-body">${stopsHtml}</div>
+        `;
+    }
+
+    /**
+     * Generates the HTML for the color/value rows in the legend.
+     * @param {number[]} colormap - The base colormap.
+     * @param {'metric'|'imperial'} currentUnit - The currently active unit system.
+     * @returns {string} The generated HTML string.
+     * @private
+     */
+    _generateStopsHtml(colormap, baseUnit, currentSystem) {
+       const parsedColormap = [];
+        for (let i = 0; i < colormap.length; i += 2) {
+            parsedColormap.push({ value: colormap[i], color: colormap[i + 1] });
+        }
+        if (parsedColormap.length < 2) return '';
+
+        const minVal = parsedColormap[0].value;
+        const maxVal = parsedColormap[parsedColormap.length - 1].value;
+        const range = maxVal - minVal;
+        const numStops = this.options.stops;
+        const targetUnit = this._getTargetUnitForLegend(baseUnit, currentSystem);
+        
+        let html = '';
+        for (let i = numStops - 1; i >= 0; i--) {
+            const value = minVal + (i / (numStops - 1)) * range;
+            const color = this._getColorForValue(value, parsedColormap);
+            
+            let displayValue = value;
+            const convert = getUnitConversionFunction(baseUnit, targetUnit);
+            if (convert) {
+                displayValue = convert(value);
+            }
+
+            html += `<div class="aguacero-legend-row">
+                <span class="aguacero-legend-swatch" style="background-color: ${color};"></span>
+                <span class="aguacero-legend-label">${this.options.labelFormatter(displayValue)}</span>
+            </div>`;
+        }
+        return html;
+    }
+
+    _getTargetUnitForLegend(baseUnit, system) {
+        const base = baseUnit.toLowerCase();
+        if (system === 'metric') {
+            if (base.includes('f') || base.includes('c')) return 'celsius';
+            if (['kts', 'mph'].includes(base)) return 'km/h';
+        }
+        return base; // Default to imperial or native
+    }
+
+    /**
+     * Interpolates the color for a given value from the colormap.
+     * @private
+     */
+    _getColorForValue(value, parsedColormap) {
+        // Find the two stops the value is between
+        let lowerStop = parsedColormap[0];
+        let upperStop = parsedColormap[parsedColormap.length - 1];
+        for (let i = 0; i < parsedColormap.length - 1; i++) {
+            if (value >= parsedColormap[i].value && value <= parsedColormap[i + 1].value) {
+                lowerStop = parsedColormap[i];
+                upperStop = parsedColormap[i + 1];
+                break;
+            }
+        }
+
+        const range = upperStop.value - lowerStop.value;
+        const t = range === 0 ? 0 : (value - lowerStop.value) / range;
+        
+        // Simple hex color interpolation
+        const c1 = parseInt(lowerStop.color.slice(1), 16);
+        const c2 = parseInt(upperStop.color.slice(1), 16);
+
+        const r1 = (c1 >> 16) & 255; const g1 = (c1 >> 8) & 255; const b1 = c1 & 255;
+        const r2 = (c2 >> 16) & 255; const g2 = (c2 >> 8) & 255; const b2 = c2 & 255;
+
+        const r = Math.round(r1 * (1 - t) + r2 * t);
+        const g = Math.round(g1 * (1 - t) + g2 * t);
+        const b = Math.round(b1 * (1 - t) + b2 * t);
+        
+        return `rgb(${r},${g},${b})`;
+    }
+}
+
+export class LayerControlPanel {
+    constructor(manager, options = {}) {
+        this.manager = manager;
+        this.element = null;
+        this.options = {
+            title: options.title || 'Layers',
+        };
+    }
+
+    /**
+     * Builds a structured object of available variables for the current model.
+     * @returns {object} A nested object: { category: { subCategory: [variableInfo, ...] } }
+     * @private
+     */
+    _getAvailableVariables() {
+        const modelName = this.manager.state.model;
+        const modelInfo = MODEL_CONFIGS[modelName];
+        if (!modelInfo) return {};
+
+        const structuredVars = {};
+        modelInfo.vars.forEach(varName => {
+            const varInfo = DICTIONARIES.fld[varName];
+            if (!varInfo) return;
+
+            const { category, subCategory, variable } = varInfo;
+            if (!structuredVars[category]) {
+                structuredVars[category] = {};
+            }
+            if (!structuredVars[category][subCategory]) {
+                structuredVars[category][subCategory] = [];
+            }
+            structuredVars[category][subCategory].push({ id: varName, name: variable });
+        });
+        return structuredVars;
+    }
+
+    /**
+     * Renders the panel's content based on available variables.
+     * @private
+     */
+    _populate() {
+        if (!this.element) return;
+
+        const variables = this._getAvailableVariables();
+        let contentHtml = '';
+
+        for (const category in variables) {
+            contentHtml += `<div class="aguacero-layer-category">
+                <div class="aguacero-layer-header">${category}</div>
+                <div class="aguacero-layer-content">`;
+            
+            for (const subCategory in variables[category]) {
+                contentHtml += `<div class="aguacero-layer-subcategory">
+                    <div class="aguacero-layer-subheader">${subCategory}</div>
+                    <div class="aguacero-layer-items">`;
+                
+                variables[category][subCategory].forEach(item => {
+                    const isActive = item.id === this.manager.state.variable ? 'active' : '';
+                    contentHtml += `<div class="aguacero-layer-item ${isActive}" data-variable-id="${item.id}">${item.name}</div>`;
+                });
+
+                contentHtml += `</div></div>`;
+            }
+            contentHtml += `</div></div>`;
+        }
+        this.element.querySelector('.aguacero-panel-body').innerHTML = contentHtml;
+        this._addEventListeners();
+    }
+
+    /**
+     * Adds click handlers for the accordion and item selection.
+     * @private
+     */
+    _addEventListeners() {
+        this.element.querySelectorAll('.aguacero-layer-header, .aguacero-layer-subheader').forEach(header => {
+            header.addEventListener('click', () => {
+                header.parentElement.classList.toggle('open');
             });
         });
 
-        // Set the initial state when the panel is added
-        this.manager.setUnits(this.options.initialUnit);
+        this.element.querySelectorAll('.aguacero-layer-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const newVariable = e.target.dataset.variableId;
+                this.manager.setVariable(newVariable);
+            });
+        });
+    }
 
+    addTo(target) {
+        const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
+        this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-layer-control';
+        this.element.innerHTML = `
+            <div class="aguacero-panel-header">${this.options.title}</div>
+            <div class="aguacero-panel-body"></div>
+        `;
+        
         targetElement.appendChild(this.element);
+
+        this.manager.on('state:change', () => this._populate());
+        this._populate(); // Initial population
         return this;
     }
 }

@@ -18,11 +18,9 @@ export class GridRenderLayer {
         this.encoding = null;
         this.textureWidth = 0;
         this.textureHeight = 0;
-
-        // --- NEW: Add properties to hold unit conversion state ---
-        this.u_conversion_type = null; // The WebGL uniform location
+        this.u_conversion_type = null;
         this.currentConversion = {
-            type: 2 
+            type: 2 // Default to Imperial (Celsius -> Fahrenheit)
         };
     }
 
@@ -40,7 +38,6 @@ export class GridRenderLayer {
                 v_texCoord = a_texCoord;
             }`;
 
-        // --- CORRECTED SHADER LOGIC ---
         const fragmentSource = `
             precision highp float;
             varying vec2 v_texCoord;
@@ -62,17 +59,9 @@ export class GridRenderLayer {
                 return value_0_to_255 - 128.0;
             }
 
-            // --- CORRECTED: This function now treats the input as Celsius ---
             float convert_units(float raw_value_celsius) {
-                // Type 1: Metric (Celsius). The data is already in Celsius, so do nothing.
-                if (u_conversion_type == 1) {
-                    return raw_value_celsius;
-                }
-                // Type 2: Imperial (Fahrenheit). Convert from Celsius to Fahrenheit.
-                if (u_conversion_type == 2) {
-                    return raw_value_celsius * 1.8 + 32.0;
-                }
-                // Fallback (should not be used)
+                if (u_conversion_type == 1) return raw_value_celsius;
+                if (u_conversion_type == 2) return raw_value_celsius * 1.8 + 32.0;
                 return raw_value_celsius;
             }
 
@@ -101,14 +90,19 @@ export class GridRenderLayer {
                 }
                 float quantized_value = total_value / total_weight;
 
-                // 1. De-quantize to get the raw physical value, which is now correctly identified as Celsius.
-                float raw_value_celsius = quantized_value * u_scale + u_offset;
+                float raw_value = quantized_value * u_scale + u_offset;
+                float converted_value = convert_units(raw_value);
 
-                // 2. Apply the selected unit conversion.
-                float converted_value = convert_units(raw_value_celsius);
+                // --- THIS IS THE FIX ---
+                // Before coloring, check if the value is within the colormap's valid range.
+                // u_data_range.x is the minimum (5) and u_data_range.y is the maximum (80).
+                if (converted_value < u_data_range.x || converted_value > u_data_range.y) {
+                    discard; // This makes the pixel transparent.
+                }
+                // --- END OF FIX ---
 
-                // 3. Normalize the converted value for the colormap.
-                float colormap_coord = clamp((converted_value - u_data_range.x) / (u_data_range.y - u_data_range.x), 0.0, 1.0);
+                // Calculate the position on the colormap (a value from 0.0 to 1.0).
+                float colormap_coord = (converted_value - u_data_range.x) / (u_data_range.y - u_data_range.x);
 
                 vec4 color = texture2D(u_colormap_texture, vec2(colormap_coord, 0.5));
                 if (color.a < 0.1) discard;
@@ -117,7 +111,17 @@ export class GridRenderLayer {
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, vertexSource); gl.compileShader(vertexShader);
         const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fragmentShader, fragmentSource); gl.compileShader(fragmentShader);
+        
+        // Error checking for shader compilation
+        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            console.error('Fragment shader failed to compile:', gl.getShaderInfoLog(fragmentShader));
+        }
+
         this.program = gl.createProgram(); gl.attachShader(this.program, vertexShader); gl.attachShader(this.program, fragmentShader); gl.linkProgram(this.program);
+        
+        if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+            console.error('Shader program failed to link:', gl.getProgramInfoLog(this.program));
+        }
         
         this.a_position = gl.getAttribLocation(this.program, "a_position");
         this.a_texCoord = gl.getAttribLocation(this.program, "a_texCoord");
@@ -235,12 +239,31 @@ export class GridRenderLayer {
      * @param {string} fromUnit - The native unit of the data (e.g., 'kelvin').
      * @param {'metric'|'imperial'} targetSystem - The target display system.
      */
-    setUnitConversion(targetSystem) {
-        if (targetSystem === 'metric') {
-            this.currentConversion.type = 1; // Corresponds to Celsius in the shader
-        } else if (targetSystem === 'imperial') {
-            this.currentConversion.type = 2; // Corresponds to Fahrenheit in the shader
+    setUnitConversion(fromUnit, targetSystem) {
+        let conversionType = 0; // Default to 0 (no conversion)
+
+        // Gracefully handle undefined or null fromUnit by defaulting to an empty string.
+        const unit = (fromUnit || '').toLowerCase();
+
+        if (unit.includes('c') || unit.includes('f')) { // Temperature
+            if (targetSystem === 'metric') {
+                conversionType = 1; // Corresponds to Celsius in the shader (no-op)
+            } else if (targetSystem === 'imperial') {
+                conversionType = 2; // Corresponds to Celsius -> Fahrenheit
+            }
+        } 
+        else if (unit === 'kts') { // Wind
+            // Use the correct numbers from your provided shader
+            if (targetSystem === 'imperial') {
+                conversionType = 8;    // kts -> mph
+            } else if (targetSystem === 'metric') {
+                conversionType = 15;   // kts -> km/h
+            }
         }
+        // Add more 'else if' blocks here for other units like 'in', 'm/s', etc.
+        // to match the integer codes in your shader.
+
+        this.currentConversion.type = conversionType;
 
         if (this.map) {
             this.map.triggerRepaint();
