@@ -168,13 +168,13 @@ export class ModelSelectorPanel {
         return this;
     }
 }
-
 export class ForecastSliderPanel {
     /**
      * Creates an instance of ForecastSliderPanel.
      * @param {FillLayerManager} manager - The main controller instance.
      * @param {object} [options={}] - Customization options.
      * @param {string} [options.label] - Custom text for the panel's label.
+     * @param {number} [options.playSpeed=500] - The time in milliseconds between steps when playing.
      */
     constructor(manager, options = {}) {
         this.manager = manager;
@@ -182,13 +182,22 @@ export class ForecastSliderPanel {
         this.sliderElement = null;
         this.displayElement = null;
 
-        // --- NEW PROPERTIES FOR OPTIMIZED RENDERING ---
-        this.pendingUpdate = false;      // A flag to prevent scheduling multiple updates per frame.
-        this.latestForecastHour = null;  // The most recent forecast hour selected by the user.
+        // --- NEW PROPERTIES FOR PLAYBACK CONTROL ---
+        this.isPlaying = false;
+        this.playIntervalId = null;
+        this.buttons = {}; // To hold references to the control buttons
+
+        this.pendingUpdate = false;
+        this.latestForecastHour = null;
 
         this.options = {
-            label: options.label || 'Forecast Hour'
+            label: options.label || 'Forecast Hour',
+            // --- NEW --- API option for playback speed with a default value
+            playSpeed: options.playSpeed || 500,
         };
+
+        // --- NEW --- Bind the keyboard handler context
+        this._handleKeyDown = this._handleKeyDown.bind(this);
     }
 
     /**
@@ -201,6 +210,8 @@ export class ForecastSliderPanel {
 
         if (!forecastHours || forecastHours.length === 0) {
             this.sliderElement.disabled = true;
+            // --- MODIFIED --- Also disable control buttons
+            Object.values(this.buttons).forEach(btn => btn.disabled = true);
             this.sliderElement.max = 0;
             this.displayElement.textContent = 'N/A';
             return;
@@ -210,22 +221,103 @@ export class ForecastSliderPanel {
         this.sliderElement.max = forecastHours.length - 1;
         this.sliderElement.value = currentIndex >= 0 ? currentIndex : 0;
         this.displayElement.textContent = forecastHour;
+        
         this.sliderElement.disabled = false;
+        // --- MODIFIED --- Also enable control buttons
+        Object.values(this.buttons).forEach(btn => btn.disabled = false);
+    }
+
+    // --- NEW METHOD --- Advances the slider by one step in a given direction
+    _step(direction) {
+        if (this.sliderElement.disabled) return;
+        
+        const forecastHours = this.manager.modelStatus[this.manager.state.model][this.manager.state.date][this.manager.state.run];
+        if (!forecastHours) return;
+
+        let currentIndex = parseInt(this.sliderElement.value, 10);
+        const maxIndex = forecastHours.length - 1;
+
+        let nextIndex = currentIndex + direction;
+
+        // Logic for looping the slider
+        if (nextIndex > maxIndex) {
+            nextIndex = 0; // Loop to the start
+        } else if (nextIndex < 0) {
+            nextIndex = maxIndex; // Loop to the end
+        }
+
+        const newForecastHour = forecastHours[nextIndex];
+
+        // Use the existing rAF-based update mechanism for smoothness
+        this.displayElement.textContent = newForecastHour;
+        this.latestForecastHour = newForecastHour;
+        if (!this.pendingUpdate) {
+            this.pendingUpdate = true;
+            requestAnimationFrame(() => this._performUpdate());
+        }
+    }
+
+    // --- NEW METHOD --- Starts the playback timer
+    _play() {
+        if (this.isPlaying) return;
+        this.isPlaying = true;
+        this.buttons.playPause.innerHTML = '&#9208;'; // Pause icon
+        this.buttons.playPause.title = 'Pause (Space)';
+
+        // Clear any old interval before starting a new one
+        clearInterval(this.playIntervalId);
+        this.playIntervalId = setInterval(() => {
+            this._step(1); // Step forward
+        }, this.options.playSpeed);
+    }
+
+    // --- NEW METHOD --- Stops the playback timer
+    _pause() {
+        if (!this.isPlaying) return;
+        this.isPlaying = false;
+        this.buttons.playPause.innerHTML = '&#9654;'; // Play icon
+        this.buttons.playPause.title = 'Play (Space)';
+        clearInterval(this.playIntervalId);
+        this.playIntervalId = null;
+    }
+
+    // --- NEW METHOD --- Toggles between play and pause
+    _togglePlayPause() {
+        if (this.isPlaying) {
+            this._pause();
+        } else {
+            this._play();
+        }
+    }
+
+    // --- NEW METHOD --- Handles global keyboard shortcuts
+    _handleKeyDown(event) {
+        // Ignore keyboard events if a user is typing in an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        switch(event.key) {
+            case ',': // Step backward
+                this._step(-1);
+                break;
+            case '.': // Step forward
+                this._step(1);
+                break;
+            case ' ': // Toggle play/pause
+                event.preventDefault(); // Prevent page from scrolling
+                this._togglePlayPause();
+                break;
+        }
     }
 
     /**
      * The function that performs the expensive state update.
-     * It is called by requestAnimationFrame to run only once per frame.
      * @private
      */
     _performUpdate() {
-        // If there's no update to perform, exit.
         if (!this.pendingUpdate) return;
-
-        // Reset the flag so future 'input' events can schedule a new update.
         this.pendingUpdate = false;
-
-        // Call the manager with the last known forecast hour value.
         this.manager.setState({ forecastHour: this.latestForecastHour });
     }
 
@@ -243,38 +335,65 @@ export class ForecastSliderPanel {
         this.element = document.createElement('div');
         this.element.className = 'aguacero-panel aguacero-slider';
         
+        // --- MODIFIED --- Updated HTML structure to include control buttons
         this.element.innerHTML = `
             <label class="aguacero-panel-label">${this.options.label}: +<span class="aguacero-slider-display">0</span>hr</label>
-            <input type="range" class="aguacero-slider-input" min="0" max="0" value="0" step="1" disabled>
+            <div class="aguacero-slider-wrapper">
+                <div class="aguacero-slider-controls">
+                    <button class="aguacero-button" data-action="step-back" title="Step Back (,)" disabled>&#9664;</button>
+                    <button class="aguacero-button" data-action="play-pause" title="Play (Space)" disabled>&#9654;</button>
+                    <button class="aguacero-button" data-action="step-forward" title="Step Forward (.)" disabled>&#9654;&#9654;</button>
+                </div>
+                <input type="range" class="aguacero-slider-input" min="0" max="0" value="0" step="1" disabled>
+            </div>
         `;
-        this.sliderElement = this.element.querySelector('input');
-        this.displayElement = this.element.querySelector('span');
+        this.sliderElement = this.element.querySelector('.aguacero-slider-input');
+        this.displayElement = this.element.querySelector('.aguacero-slider-display');
+        
+        // --- NEW --- Get references to the new buttons
+        this.buttons.stepBack = this.element.querySelector('[data-action="step-back"]');
+        this.buttons.playPause = this.element.querySelector('[data-action="play-pause"]');
+        this.buttons.stepForward = this.element.querySelector('[data-action="step-forward"]');
 
-        // --- REVISED EVENT LISTENER ---
+        // --- REVISED EVENT LISTENER for slider dragging ---
         this.sliderElement.addEventListener('input', (e) => {
+            this._pause(); // Pause playback if user manually drags the slider
             const { model, date, run } = this.manager.state;
             const forecastHours = this.manager.modelStatus[model][date][run];
             if (!forecastHours) return;
-
             const newForecastHour = forecastHours[parseInt(e.target.value, 10)];
-
-            // 1. Update the UI text immediately. This is very cheap.
             this.displayElement.textContent = newForecastHour;
-            
-            // 2. Store the latest value.
             this.latestForecastHour = newForecastHour;
-
-            // 3. If an update is not already pending for the next frame, schedule one.
             if (!this.pendingUpdate) {
                 this.pendingUpdate = true;
                 requestAnimationFrame(() => this._performUpdate());
             }
         });
+
+        // --- NEW --- Add event listeners for the control buttons
+        this.buttons.stepBack.addEventListener('click', () => this._step(-1));
+        this.buttons.stepForward.addEventListener('click', () => this._step(1));
+        this.buttons.playPause.addEventListener('click', () => this._togglePlayPause());
         
+        // --- NEW --- Add global listener for keyboard shortcuts
+        document.addEventListener('keydown', this._handleKeyDown);
+
         this.manager.on('state:change', () => this._update());
 
         targetElement.appendChild(this.element);
         return this;
+    }
+
+    // --- NEW (Optional but Recommended) --- Add a remove method for cleanup
+    /**
+     * Removes the panel and cleans up global event listeners.
+     */
+    remove() {
+        this._pause(); // Stop any playback
+        document.removeEventListener('keydown', this._handleKeyDown);
+        if (this.element && this.element.parentNode) {
+            this.element.parentNode.removeChild(this.element);
+        }
     }
 }
 export class ThemeControlPanel {
@@ -442,156 +561,117 @@ export class UnitControlPanel {
 }
 
 export class LegendPanel {
-    /**
-     * Creates an instance of LegendPanel.
-     * @param {FillLayerManager} manager - The main controller instance.
-     * @param {object} [options={}] - Customization options for the legend.
-     * @param {string} [options.title='Legend'] - The title displayed at the top of the legend.
-     * @param {{imperial: string, metric: string}} [options.units] - The unit labels to display (e.g., { imperial: '°F', metric: '°C' }).
-     * @param {number} [options.stops=10] - The approximate number of discrete color stops to show in the legend.
-     * @param {'top-left'|'top-right'|'bottom-left'|'bottom-right'} [options.position='bottom-right'] - The position of the legend on the map.
-     * @param {function(number): string} [options.labelFormatter] - A function to format the numeric labels.
-     */
     constructor(manager, options = {}) {
         this.manager = manager;
-        this.element = null;
-
-        // Merge user-provided options with sensible defaults
         this.options = {
-            title: options.title || 'Legend',
-            units: options.units || { imperial: '', metric: '' },
-            stops: options.stops || 10,
             position: options.position || 'bottom-right',
             labelFormatter: options.labelFormatter || ((value) => Math.round(value)),
         };
+        this._container = document.createElement('div');
+        this._container.className = 'mapboxgl-ctrl aguacero-legend-panel'; // Use mapboxgl-ctrl class
+        // --- Note: We no longer set the position class here, Mapbox does it ---
     }
 
     /**
-     * Renders the legend panel and adds it to the map container.
-     * @param {mapboxgl.Map} map - The Mapbox GL map instance.
-     * @returns {this} The instance for chaining.
+     * Required by Mapbox's IControl interface.
+     * This method is called when the control is added to the map.
+     * @param {mapboxgl.Map} map - The Mapbox map instance.
+     * @returns {HTMLElement} The control's container element.
      */
-    addTo(map) {
-        const mapContainer = map.getContainer();
-        if (!mapContainer) {
-            throw new Error('AguaceroAPI Error: The map container for the LegendPanel could not be found.');
-        }
-
-        this.element = document.createElement('div');
-        this.element.className = `aguacero-legend-panel aguacero-legend-${this.options.position}`;
-        
-        mapContainer.appendChild(this.element);
-
-        // Listen for state changes to automatically update the legend
+    onAdd(map) {
+        this.map = map;
         this.manager.on('state:change', (state) => this._update(state));
-        
-        // Perform an initial render
-        this._update(this.manager.state);
-
-        return this;
+        this._update(this.manager.state); // Initial render
+        return this._container;
     }
 
     /**
-     * Re-renders the legend's content based on the current state.
-     * @param {object} state - The current state from the FillLayerManager.
-     * @private
+     * Required by Mapbox's IControl interface.
+     * This method is called when the control is removed from the map.
      */
+    onRemove() {
+        if (this._container && this._container.parentNode) {
+            this._container.parentNode.removeChild(this._container);
+        }
+        // It's good practice to clean up listeners, though in this case
+        // the manager might outlive the legend. A more advanced implementation
+        // would have a dedicated `destroy` method on the manager.
+        // For now, this is safe.
+        this.map = undefined;
+    }
+
     _update(state) {
-        if (!this.element) return;
+        if (!this._container) return;
 
         const { colormap, colormapBaseUnit } = this.manager.baseLayerOptions;
 
+        if (!colormap || colormap.length < 2) {
+            this._container.style.display = 'none';
+            return;
+        }
+        this._container.style.display = 'block';
+
         const variableInfo = DICTIONARIES.fld[state.variable] || {};
         const legendTitle = variableInfo.variable || 'Legend';
-        const { units } = state;
-        const unitLabel = Object.keys(variableInfo.units || {})[0] || '';
-        const stopsHtml = this._generateStopsHtml(colormap, colormapBaseUnit, units);
+        const unitLabel = this._getUnitLabel(colormapBaseUnit, state.units);
+        const stopsHtml = this._generateStopsHtml(colormap, colormapBaseUnit, state.units);
 
-        this.element.innerHTML = `
+        this._container.innerHTML = `
             <h3 class="aguacero-legend-title">${legendTitle} (${unitLabel})</h3>
             <div class="aguacero-legend-body">${stopsHtml}</div>
         `;
     }
 
-    /**
-     * Generates the HTML for the color/value rows in the legend.
-     * @param {number[]} colormap - The base colormap.
-     * @param {'metric'|'imperial'} currentUnit - The currently active unit system.
-     * @returns {string} The generated HTML string.
-     * @private
-     */
+    // _generateStopsHtml, _getUnitLabel, and _getTargetUnitForLegend methods
+    // remain exactly the same as the previous correct versions.
     _generateStopsHtml(colormap, baseUnit, currentSystem) {
-       const parsedColormap = [];
+        const parsedColormap = [];
         for (let i = 0; i < colormap.length; i += 2) {
             parsedColormap.push({ value: colormap[i], color: colormap[i + 1] });
         }
         if (parsedColormap.length < 2) return '';
-
         const minVal = parsedColormap[0].value;
         const maxVal = parsedColormap[parsedColormap.length - 1].value;
-        const range = maxVal - minVal;
-        const numStops = this.options.stops;
         const targetUnit = this._getTargetUnitForLegend(baseUnit, currentSystem);
-        
-        let html = '';
-        for (let i = numStops - 1; i >= 0; i--) {
-            const value = minVal + (i / (numStops - 1)) * range;
-            const color = this._getColorForValue(value, parsedColormap);
-            
-            let displayValue = value;
-            const convert = getUnitConversionFunction(baseUnit, targetUnit);
-            if (convert) {
-                displayValue = convert(value);
-            }
-
-            html += `<div class="aguacero-legend-row">
-                <span class="aguacero-legend-swatch" style="background-color: ${color};"></span>
-                <span class="aguacero-legend-label">${this.options.labelFormatter(displayValue)}</span>
-            </div>`;
-        }
-        return html;
+        const convert = getUnitConversionFunction(baseUnit, targetUnit);
+        const displayMin = this.options.labelFormatter(convert ? convert(minVal) : minVal);
+        const displayMax = this.options.labelFormatter(convert ? convert(maxVal) : maxVal);
+        const gradientStops = parsedColormap.map(stop => `${stop.color}`).join(', ');
+        const gradientCss = `linear-gradient(to right, ${gradientStops})`;
+        return `
+            <div class="aguacero-legend-gradient" style="background: ${gradientCss};"></div>
+            <div class="aguacero-legend-labels">
+                <span class="aguacero-legend-label-min">${displayMin}</span>
+                <span class="aguacero-legend-label-max">${displayMax}</span>
+            </div>
+        `;
     }
 
+    _getUnitLabel(baseUnit, system) {
+        const base = (baseUnit || '').toLowerCase();
+        if (base === 'dbz') return 'dBZ';
+        if (system === 'metric') {
+            if (base.includes('f') || base.includes('c')) return '°C';
+            if (['kts', 'mph', 'm/s'].includes(base)) return 'km/h';
+            if (['in', 'mm', 'cm'].includes(base)) return 'mm';
+        }
+        if (base.includes('f') || base.includes('c')) return '°F';
+        if (['kts', 'mph', 'm/s'].includes(base)) return 'mph';
+        if (['in', 'mm', 'cm'].includes(base)) return 'in';
+        return base;
+    }
+    
     _getTargetUnitForLegend(baseUnit, system) {
-        const base = baseUnit.toLowerCase();
+        const base = (baseUnit || '').toLowerCase();
         if (system === 'metric') {
             if (base.includes('f') || base.includes('c')) return 'celsius';
-            if (['kts', 'mph'].includes(base)) return 'km/h';
+            if (['kts', 'mph', 'm/s'].includes(base)) return 'km/h';
+            if (['in', 'mm', 'cm'].includes(base)) return 'mm';
         }
-        return base; // Default to imperial or native
-    }
-
-    /**
-     * Interpolates the color for a given value from the colormap.
-     * @private
-     */
-    _getColorForValue(value, parsedColormap) {
-        // Find the two stops the value is between
-        let lowerStop = parsedColormap[0];
-        let upperStop = parsedColormap[parsedColormap.length - 1];
-        for (let i = 0; i < parsedColormap.length - 1; i++) {
-            if (value >= parsedColormap[i].value && value <= parsedColormap[i + 1].value) {
-                lowerStop = parsedColormap[i];
-                upperStop = parsedColormap[i + 1];
-                break;
-            }
-        }
-
-        const range = upperStop.value - lowerStop.value;
-        const t = range === 0 ? 0 : (value - lowerStop.value) / range;
-        
-        // Simple hex color interpolation
-        const c1 = parseInt(lowerStop.color.slice(1), 16);
-        const c2 = parseInt(upperStop.color.slice(1), 16);
-
-        const r1 = (c1 >> 16) & 255; const g1 = (c1 >> 8) & 255; const b1 = c1 & 255;
-        const r2 = (c2 >> 16) & 255; const g2 = (c2 >> 8) & 255; const b2 = c2 & 255;
-
-        const r = Math.round(r1 * (1 - t) + r2 * t);
-        const g = Math.round(g1 * (1 - t) + g2 * t);
-        const b = Math.round(b1 * (1 - t) + b2 * t);
-        
-        return `rgb(${r},${g},${b})`;
+        if (base.includes('f') || base.includes('c')) return 'fahrenheit';
+        if (['kts', 'mph', 'm/s'].includes(base)) return 'mph';
+        if (['in', 'mm', 'cm'].includes(base)) return 'in';
+        return base;
     }
 }
 

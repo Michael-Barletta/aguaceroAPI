@@ -7,6 +7,7 @@ import { getUnitConversionFunction } from './unitConversions.js';
 // NEW IMPORTS
 import { DICTIONARIES } from './model-definitions.js';
 import { DEFAULT_COLORMAPS } from './default-colormaps.js';
+import { injectStyles } from './styles.js'; 
 
 function findLatestModelRun(modelsData, modelName) {
     const model = modelsData?.[modelName];
@@ -26,59 +27,43 @@ export class FillLayerManager extends EventEmitter {
         super();
         if (!map) throw new Error('A Mapbox GL map instance is required.');
 
+        injectStyles();
+
         this.map = map;
         this.layers = new Map();
+        
+        // --- THIS IS THE FIX ---
+        // Re-introduce the missing layerId initialization.
+        this.layerId = options.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
+        // ------------------------
+
         this.baseUrl = 'https://d3dc62msmxkrd7.cloudfront.net/grids';
         this.worker = this.createWorker();
+        this.workerRequestId = 0;
+        this.workerResolvers = new Map();
+        this.worker.addEventListener('message', this._handleWorkerMessage.bind(this));
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
         this.loadStrategy = options.loadStrategy || 'on-demand';
         this.dataCache = new Map();
-        this.workerRequestId = 0; // A counter for unique request IDs.
-        this.workerResolvers = new Map(); // Stores the promises waiting for a worker response.
-        // Set up ONE central listener to route all worker messages.
-        this.worker.addEventListener('message', this._handleWorkerMessage.bind(this));
-
-        // --- START OF CORRECTED LOGIC ---
-
-        // 1. Set the layerId immediately and ensure it's never undefined.
-        this.layerId = options.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
-
-        // 2. Safely get the user-provided layer options, defaulting to an empty object.
+        
+        // --- The rest of the constructor logic is correct ---
+        this.customColormaps = options.customColormaps || {};
         const userLayerOptions = options.layerOptions || {};
+        const initialVariable = userLayerOptions.variable || '2t_2';
 
-        // 3. Determine if a custom colormap was provided.
-        const hasCustomColormap = !!userLayerOptions.colormap;
+        const { colormap, baseUnit } = this._getColormapForVariable(initialVariable);
 
-        // 4. Initialize baseLayerOptions, which will hold the colormap and other static settings.
         this.baseLayerOptions = {
             ...userLayerOptions,
-            customColormap: hasCustomColormap,
-            colormapBaseUnit: userLayerOptions.colormapBaseUnit || 'fahrenheit',
+            variable: initialVariable,
+            colormap: colormap,
+            colormapBaseUnit: baseUnit,
         };
 
-        // 5. If no custom colormap was provided, look up the default one for the initial variable.
-        //    This makes removing the hardcoded colormap from app.js work correctly on startup.
-        if (!hasCustomColormap) {
-            const initialVariable = userLayerOptions.variable || '2t_2';
-            const cmapKey = DICTIONARIES.variable_cmap?.[initialVariable] || initialVariable;
-            const defaultColormapSet = DEFAULT_COLORMAPS[cmapKey];
-
-            if (defaultColormapSet) {
-                const baseUnit = Object.keys(defaultColormapSet.units)[0];
-                this.baseLayerOptions.colormap = defaultColormapSet.units[baseUnit].colormap;
-                this.baseLayerOptions.colormapBaseUnit = baseUnit;
-            } else {
-                 console.warn(`[Manager] No default colormap found for initial variable "${initialVariable}".`);
-                 // Provide a simple black-to-white fallback colormap to prevent crashes.
-                 this.baseLayerOptions.colormap = [0, '#000000', 1, '#ffffff'];
-            }
-        }
-
-        // 6. Initialize the dynamic state object that will be updated throughout the app's life.
         this.state = {
             model: userLayerOptions.model || 'gfs',
-            variable: userLayerOptions.variable || '2t_2',
+            variable: initialVariable,
             date: null,
             run: null,
             forecastHour: 0,
@@ -86,8 +71,6 @@ export class FillLayerManager extends EventEmitter {
             opacity: userLayerOptions.opacity ?? 1,
             units: options.initialUnit || 'imperial'
         };
-
-        // --- END OF CORRECTED LOGIC ---
 
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
@@ -120,6 +103,59 @@ export class FillLayerManager extends EventEmitter {
         } 
     }
 
+    _getColormapForVariable(variableName) {
+        const customMap = this.customColormaps[variableName];
+
+        // 1. Check for a user-defined custom colormap.
+        if (customMap) {
+            // --- NEW: Check for the advanced, unit-specific structure first ---
+            if (customMap.units) {
+                const currentSystem = this.state.units; // 'imperial' or 'metric'
+                
+                // Determine which key to look for in the user's definition
+                let targetUnitKey;
+                if (currentSystem === 'imperial') targetUnitKey = 'fahrenheit';
+                if (currentSystem === 'metric') targetUnitKey = 'celsius';
+                
+                // If the user provided a specific map for the current unit system, use it.
+                if (targetUnitKey && customMap.units[targetUnitKey]?.colormap) {
+                    return {
+                        colormap: customMap.units[targetUnitKey].colormap,
+                        baseUnit: targetUnitKey // The base unit IS the target unit, so no conversion will be needed
+                    };
+                }
+            }
+
+            // --- Fallback to the simple custom colormap structure ---
+            if (customMap.colormap && customMap.baseUnit) {
+                return {
+                    colormap: customMap.colormap,
+                    baseUnit: customMap.baseUnit
+                };
+            }
+        }
+
+        // 2. If no custom map, look in the API's defaults.
+        // ... (this part is unchanged)
+        const cmapKey = DICTIONARIES.variable_cmap?.[variableName] || variableName;
+        const defaultColormapSet = DEFAULT_COLORMAPS[cmapKey];
+        if (defaultColormapSet) {
+            const baseUnit = Object.keys(defaultColormapSet.units)[0];
+            return {
+                colormap: defaultColormapSet.units[baseUnit].colormap,
+                baseUnit: baseUnit
+            };
+        }
+
+        // 3. If no default is found, return a safe fallback.
+        // ... (this part is unchanged)
+        console.warn(`[Manager] No custom or default colormap found for variable "${variableName}". Using fallback.`);
+        return {
+            colormap: [0, '#000000', 1, '#ffffff'],
+            baseUnit: 'unknown'
+        };
+    }
+
     _convertColormapUnits(colormap, fromUnits, toUnits) {
         if (fromUnits === toUnits) return colormap;
         const conversionFunc = getUnitConversionFunction(fromUnits, toUnits);
@@ -139,31 +175,33 @@ export class FillLayerManager extends EventEmitter {
             return;
         }
 
-        const baseUnit = options.colormapBaseUnit || 'fahrenheit';
+        // --- START OF CORRECTED LOGIC ---
+        const fromUnit = options.colormapBaseUnit; // The unit of the colormap we received (e.g., '°C')
         const variableInfo = DICTIONARIES.fld[variable] || {};
-        const targetUnit = this._getTargetUnit(variableInfo.defaultUnit, units);
         
-        const convertedColormap = this._convertColormapUnits(colormap, baseUnit, targetUnit);
-        const dataRange = [convertedColormap[0], convertedColormap[convertedColormap.length - 2]];
+        // Determine the target unit for the DISPLAY based on the current system (e.g., 'fahrenheit')
+        const toUnit = this._getTargetUnit(fromUnit, units);
 
-        // MODIFIED: Provide a fallback of 'none' if defaultUnit is missing.
+        // AUTOMATIC CONVERSION: If the colormap's native unit is different from the target
+        // display unit, convert its values.
+        const finalColormap = this._convertColormapUnits(colormap, fromUnit, toUnit);
+        
+        // The dataRange is now derived from the correctly-converted colormap.
+        const dataRange = [finalColormap[0], finalColormap[finalColormap.length - 2]];
+        // --- END OF CORRECTED LOGIC ---
+
         const dataNativeUnit = variableInfo.defaultUnit || 'none';
 
         const layerExists = this.layers.has(id);
         const shaderLayer = layerExists ? this.layers.get(id).shaderLayer : new GridRenderLayer(id);
 
         if (!layerExists) {
-            const beforeId = 'AML_-_terrain';
-            if (this.map.getLayer(beforeId)) {
-                this.map.addLayer(shaderLayer, beforeId);
-            } else {
-                this.map.addLayer(shaderLayer);
-            }
+            this.map.addLayer(shaderLayer, 'AML_-_terrain');
             this.layers.set(id, { id, shaderLayer, options, visible });
         }
 
         shaderLayer.updateDataTexture(decompressedData, encoding, gridConfig.grid_params.nx, gridConfig.grid_params.ny);
-        shaderLayer.updateColormapTexture(convertedColormap);
+        shaderLayer.updateColormapTexture(finalColormap); // Use the converted colormap
         shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
         shaderLayer.setUnitConversion(dataNativeUnit, units);
 
@@ -196,23 +234,16 @@ export class FillLayerManager extends EventEmitter {
      */
     async setVariable(newVariable) {
         if (newVariable === this.state.variable) return;
-        // If the user did NOT provide a custom colormap on initialization...
-        if (!this.baseLayerOptions.customColormap) {
-            
-            const cmapKey = DICTIONARIES.variable_cmap[newVariable] || newVariable;
-            const defaultColormapSet = DEFAULT_COLORMAPS[cmapKey];
 
-            if (defaultColormapSet) {
-                const baseUnit = Object.keys(defaultColormapSet.units)[0];
-                this.baseLayerOptions.colormap = defaultColormapSet.units[baseUnit].colormap;
-                this.baseLayerOptions.colormapBaseUnit = baseUnit;
-                
-            } else {
-                console.warn(`[Manager] No default colormap found for variable "${newVariable}".`);
-            }
-        }
+        // Use the centralized lookup function to get the correct colormap
+        const { colormap, baseUnit } = this._getColormapForVariable(newVariable);
         
+        // Update the base options that will be used for rendering this variable
         this.baseLayerOptions.variable = newVariable;
+        this.baseLayerOptions.colormap = colormap;
+        this.baseLayerOptions.colormapBaseUnit = baseUnit;
+        
+        // Trigger the state update, which will now use the new base options
         await this.setState({ variable: newVariable });
     }
 
