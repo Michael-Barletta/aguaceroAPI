@@ -33,7 +33,11 @@ export class FillLayerManager extends EventEmitter {
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
         this.loadStrategy = options.loadStrategy || 'on-demand';
-        
+        this.dataCache = new Map();
+        this.workerRequestId = 0; // A counter for unique request IDs.
+        this.workerResolvers = new Map(); // Stores the promises waiting for a worker response.
+        // Set up ONE central listener to route all worker messages.
+        this.worker.addEventListener('message', this._handleWorkerMessage.bind(this));
 
         // --- START OF CORRECTED LOGIC ---
 
@@ -88,6 +92,32 @@ export class FillLayerManager extends EventEmitter {
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
         this.autoRefreshIntervalId = null;
+    }
+
+    // --- START OF FIX ---
+    /**
+     * NEW METHOD: A central router for all messages coming from the web worker.
+     * It uses the requestId to resolve the correct promise.
+     * @private
+     */
+    _handleWorkerMessage(e) {
+        const { success, requestId, decompressedData, encoding, error } = e.data;
+
+        // Check if there's a promise waiting for this ID.
+        if (this.workerResolvers.has(requestId)) {
+            const { resolve, reject } = this.workerResolvers.get(requestId);
+            
+            if (success) {
+                // IMPORTANT: The worker returns the decompressed data and the original encoding object.
+                const result = { data: decompressedData, encoding: encoding };
+                resolve(result);
+            } else {
+                reject(new Error(error));
+            }
+            
+            // Clean up the resolver map.
+            this.workerResolvers.delete(requestId);
+        } 
     }
 
     _convertColormapUnits(colormap, fromUnits, toUnits) {
@@ -189,6 +219,12 @@ export class FillLayerManager extends EventEmitter {
     async setState(newState) {
         const modelChanged = newState.model && newState.model !== this.state.model;
         const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
+        const variableChanged = newState.variable && newState.variable !== this.state.variable;
+
+        if (modelChanged || runChanged || variableChanged) {
+            this.dataCache.clear();
+        }
+        // --- END OF FIX ---
 
         Object.assign(this.state, newState);
 
@@ -203,9 +239,12 @@ export class FillLayerManager extends EventEmitter {
         
         this.emit('state:change', this.state);
         
-        if ((modelChanged || runChanged) && this.loadStrategy === 'preload') {
+        // --- START OF FIX ---
+        // 3. Trigger the preload if the context has changed and the strategy is 'preload'.
+        if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload') {
             setTimeout(() => this._preloadCurrentRun(), 0);
         }
+        // --- END OF FIX ---
     }
 
     async setModel(modelName) {
@@ -229,25 +268,24 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-    // ... (All other methods like initialize, loadGridData, createWorker, etc., are unchanged) ...
-    createWorker() {
+        createWorker() {
+        // --- START OF FIX ---
+        // The worker code MUST now handle the `requestId` and pass it back.
+        // It also needs to pass the `encoding` object through untouched.
         const workerCode = `
             import { decompress } from 'https://cdn.skypack.dev/fzstd@0.1.1';
 
             self.onmessage = async (e) => {
-                const { compressedData, encoding } = e.data;
+                const { requestId, compressedData, encoding } = e.data;
                 try {
                     const decompressedDeltas = decompress(compressedData);
                     const expectedLength = encoding.length;
                     const reconstructedData = new Int8Array(expectedLength);
 
                     if (decompressedDeltas.length > 0 && expectedLength > 0) {
-                        // The first value is absolute
                         reconstructedData[0] = decompressedDeltas[0] > 127 
                             ? decompressedDeltas[0] - 256 
                             : decompressedDeltas[0];
-
-                        // Subsequent values are deltas from the previous value
                         for (let i = 1; i < expectedLength; i++) {
                             const delta = decompressedDeltas[i] > 127 
                                 ? decompressedDeltas[i] - 256 
@@ -257,13 +295,26 @@ export class FillLayerManager extends EventEmitter {
                     }
 
                     const finalData = new Uint8Array(reconstructedData.buffer);
-                    self.postMessage({ success: true, decompressedData: finalData }, [finalData.buffer]);
+                    
+                    // Respond with the ID, the result, and the original encoding object.
+                    self.postMessage({ 
+                        success: true, 
+                        requestId: requestId, 
+                        decompressedData: finalData,
+                        encoding: encoding 
+                    }, [finalData.buffer]);
 
                 } catch (error) {
-                    self.postMessage({ success: false, error: error.message });
+                    // If it fails, still include the ID so the main thread knows which request failed.
+                    self.postMessage({ 
+                        success: false, 
+                        requestId: requestId, 
+                        error: error.message 
+                    });
                 }
             };
         `;
+        // --- END OF FIX ---
         const blob = new Blob([workerCode], { type: 'application/javascript' });
         return new Worker(URL.createObjectURL(blob), { type: 'module' });
     }
@@ -273,6 +324,7 @@ export class FillLayerManager extends EventEmitter {
      * This is used by the 'preload' load strategy.
      * @private
      */
+    // Replace the existing _preloadCurrentRun method with this one.
     async _preloadCurrentRun() {
         const { model, date, run } = this.state;
         const forecastHours = this.modelStatus?.[model]?.[date]?.[run];
@@ -281,11 +333,16 @@ export class FillLayerManager extends EventEmitter {
             return;
         }
 
-        const preloadPromises = forecastHours.map(forecastHour => {
-            const tempState = { ...this.state, forecastHour };
-            return this._loadGridData(tempState);
+        // --- CRITICAL FIX ---
+        // Instead of using .map directly on the state, we create a new state object
+        // for each iteration to avoid closure-related bugs.
+        const preloadPromises = forecastHours.map(hour => {
+            const stateForHour = { ...this.state, forecastHour: hour };
+            // We call _loadGridData, which will either start a fetch or return an existing promise.
+            return this._loadGridData(stateForHour);
         });
-
+        
+        // We wait for all preloading promises to settle.
         await Promise.all(preloadPromises);
     }
 
@@ -335,32 +392,49 @@ export class FillLayerManager extends EventEmitter {
     }
     async _loadGridData(state) {
         const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
-        const dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`;
+        const dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
 
-        const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
-        try {
-            const response = await fetch(dataUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const { data: b64Data, encoding } = await response.json();
-            const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
-            return new Promise((resolve) => {
-                const handleWorkerMessage = (e) => {
-                    this.worker.removeEventListener('message', handleWorkerMessage);
-                    if (e.data.success) {
-                        const result = { data: e.data.decompressedData, encoding: encoding };
-                        resolve(result);
-                    } else {
-                        console.error("Worker failed:", e.data.error);
-                        resolve(null);
-                    }
-                };
-                this.worker.addEventListener('message', handleWorkerMessage);
-                this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]);
-            });
-        } catch (error) {
-            console.warn(`Failed to fetch data for ${dataUrlIdentifier}:`, error.message);
-            return null;
+        if (this.dataCache.has(dataUrlIdentifier)) {
+            const cachedItem = this.dataCache.get(dataUrlIdentifier);
+            return cachedItem;
         }
+
+        const loadPromise = new Promise(async (resolve, reject) => {
+            const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
+
+            try {
+                const response = await fetch(dataUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status} for ${dataUrl}`);
+                
+                const { data: b64Data, encoding } = await response.json();
+                const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+                
+                // --- START OF FIX ---
+                // This is the core change. We no longer add a listener here.
+                // We create a unique ID, store the promise's resolve/reject functions,
+                // and post the message with the ID. The central router will handle the response.
+                const requestId = this.workerRequestId++;
+                this.workerResolvers.set(requestId, { resolve, reject });
+                this.worker.postMessage({ requestId, compressedData, encoding }, [compressedData.buffer]);
+                // --- END OF FIX ---
+
+            } catch (error) {
+                reject(error); // Reject the main promise on fetch failure.
+            }
+        })
+        .then(result => {
+            // This runs when the worker promise resolves successfully.
+            this.dataCache.set(dataUrlIdentifier, result);
+            return result;
+        })
+        .catch(error => {
+            // This runs if either the fetch or the worker promise rejects.
+            this.dataCache.delete(dataUrlIdentifier); // Allow a retry.
+            return null; // Resolve with null to prevent crashing the app.
+        });
+        
+        this.dataCache.set(dataUrlIdentifier, loadPromise);
+        return loadPromise;
     }
     async setUnits(newUnits) {
         if (newUnits === this.state.units || !['metric', 'imperial'].includes(newUnits)) { return; } await this.setState({ units: newUnits });

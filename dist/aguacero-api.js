@@ -10,7 +10,7 @@ class A {
     i && i.forEach((n) => n(t));
   }
 }
-class H {
+class F {
   constructor(e) {
     this.id = e, this.type = "custom", this.renderingMode = "2d", this.map = null, this.gl = null, this.program = null, this.opacity = 1, this.dataRange = [0, 1], this.vertexBuffer = null, this.indexBuffer = null, this.indexCount = 0, this.dataTexture = null, this.colormapTexture = null, this.encoding = null, this.textureWidth = 0, this.textureHeight = 0, this.u_conversion_type = null, this.currentConversion = {
       type: 2
@@ -98,26 +98,26 @@ class H {
                 gl_FragColor = vec4(color.rgb, color.a * u_opacity);
             }`, r = t.createShader(t.VERTEX_SHADER);
     t.shaderSource(r, i), t.compileShader(r);
-    const o = t.createShader(t.FRAGMENT_SHADER);
-    t.shaderSource(o, n), t.compileShader(o), t.getShaderParameter(o, t.COMPILE_STATUS) || console.error("Fragment shader failed to compile:", t.getShaderInfoLog(o)), this.program = t.createProgram(), t.attachShader(this.program, r), t.attachShader(this.program, o), t.linkProgram(this.program), t.getProgramParameter(this.program, t.LINK_STATUS) || console.error("Shader program failed to link:", t.getProgramInfoLog(this.program)), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.updateGeometry();
+    const s = t.createShader(t.FRAGMENT_SHADER);
+    t.shaderSource(s, n), t.compileShader(s), t.getShaderParameter(s, t.COMPILE_STATUS) || console.error("Fragment shader failed to compile:", t.getShaderInfoLog(s)), this.program = t.createProgram(), t.attachShader(this.program, r), t.attachShader(this.program, s), t.linkProgram(this.program), t.getProgramParameter(this.program, t.LINK_STATUS) || console.error("Shader program failed to link:", t.getProgramInfoLog(this.program)), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.updateGeometry();
   }
   // This method remains unchanged
   updateGeometry(e = { lon_tl: -180, lat_tl: 90, lon_tr: 180, lat_tr: 90, lon_bl: -180, lat_bl: -90, lon_br: 180, lat_br: -90 }) {
     const t = this.gl;
     if (!t) return;
-    const i = 120, n = [], r = [], o = 89.5;
-    for (let s = 0; s <= i; s++)
+    const i = 120, n = [], r = [], s = 89.5;
+    for (let o = 0; o <= i; o++)
       for (let c = 0; c <= i; c++) {
-        const f = c / i, d = s / i, _ = e.lon_tl + f * (e.lon_tr - e.lon_tl);
-        let l = e.lat_tl + d * (e.lat_bl - e.lat_tl);
-        l = Math.max(-o, Math.min(o, l));
-        const u = mapboxgl.MercatorCoordinate.fromLngLat({ lon: _, lat: l }), m = f, h = d;
-        n.push(u.x, u.y, m, h);
+        const f = c / i, p = o / i, _ = e.lon_tl + f * (e.lon_tr - e.lon_tl);
+        let l = e.lat_tl + p * (e.lat_bl - e.lat_tl);
+        l = Math.max(-s, Math.min(s, l));
+        const d = mapboxgl.MercatorCoordinate.fromLngLat({ lon: _, lat: l }), u = f, h = p;
+        n.push(d.x, d.y, u, h);
       }
-    for (let s = 0; s < i; s++)
+    for (let o = 0; o < i; o++)
       for (let c = 0; c < i; c++) {
-        const f = s * (i + 1) + c, d = f + 1, _ = (s + 1) * (i + 1) + c, l = _ + 1;
-        r.push(f, _, d, d, _, l);
+        const f = o * (i + 1) + c, p = f + 1, _ = (o + 1) * (i + 1) + c, l = _ + 1;
+        r.push(f, _, p, p, _, l);
       }
     t.bindBuffer(t.ARRAY_BUFFER, this.vertexBuffer), t.bufferData(t.ARRAY_BUFFER, new Float32Array(n), t.STATIC_DRAW), t.bindBuffer(t.ELEMENT_ARRAY_BUFFER, this.indexBuffer), t.bufferData(t.ELEMENT_ARRAY_BUFFER, new Uint16Array(r), t.STATIC_DRAW), this.indexCount = r.length;
   }
@@ -126,12 +126,12 @@ class H {
     const r = this.gl;
     if (!r) return;
     this.encoding = t, this.textureWidth = i, this.textureHeight = n;
-    const o = new Uint8Array(e.length);
-    for (let s = 0; s < e.length; s++) {
-      const c = e[s] > 127 ? e[s] - 256 : e[s];
-      o[s] = c + 128;
+    const s = new Uint8Array(e.length);
+    for (let o = 0; o < e.length; o++) {
+      const c = e[o] > 127 ? e[o] - 256 : e[o];
+      s[o] = c + 128;
     }
-    r.bindTexture(r.TEXTURE_2D, this.dataTexture), r.pixelStorei(r.UNPACK_ALIGNMENT, 1), r.texImage2D(r.TEXTURE_2D, 0, r.LUMINANCE, i, n, 0, r.LUMINANCE, r.UNSIGNED_BYTE, o), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MIN_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MAG_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_S, r.CLAMP_TO_EDGE), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_T, r.CLAMP_TO_EDGE);
+    r.bindTexture(r.TEXTURE_2D, this.dataTexture), r.pixelStorei(r.UNPACK_ALIGNMENT, 1), r.texImage2D(r.TEXTURE_2D, 0, r.LUMINANCE, i, n, 0, r.LUMINANCE, r.UNSIGNED_BYTE, s), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MIN_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MAG_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_S, r.CLAMP_TO_EDGE), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_T, r.CLAMP_TO_EDGE);
   }
   // This method remains unchanged
   updateColormapTexture(e) {
@@ -141,14 +141,14 @@ class H {
     for (let l = 0; l < e.length; l += 2)
       r.push({ value: e[l], color: e[l + 1] });
     if (r.length === 0) return;
-    const o = r[0].value, c = r[r.length - 1].value - o, f = (l) => [parseInt(l.slice(1, 3), 16), parseInt(l.slice(3, 5), 16), parseInt(l.slice(5, 7), 16)], d = (l, u, m) => [Math.round(l[0] * (1 - m) + u[0] * m), Math.round(l[1] * (1 - m) + u[1] * m), Math.round(l[2] * (1 - m) + u[2] * m)];
+    const s = r[0].value, c = r[r.length - 1].value - s, f = (l) => [parseInt(l.slice(1, 3), 16), parseInt(l.slice(3, 5), 16), parseInt(l.slice(5, 7), 16)], p = (l, d, u) => [Math.round(l[0] * (1 - u) + d[0] * u), Math.round(l[1] * (1 - u) + d[1] * u), Math.round(l[2] * (1 - u) + d[2] * u)];
     let _ = 0;
     for (let l = 0; l < i; l++) {
-      const u = o + l / (i - 1) * c;
-      for (; _ < r.length - 2 && u > r[_ + 1].value; )
+      const d = s + l / (i - 1) * c;
+      for (; _ < r.length - 2 && d > r[_ + 1].value; )
         _++;
-      const m = r[_], h = r[_ + 1], b = (u - m.value) / (h.value - m.value), v = d(f(m.color), f(h.color), b);
-      n[l * 4] = v[0], n[l * 4 + 1] = v[1], n[l * 4 + 2] = v[2], n[l * 4 + 3] = 255;
+      const u = r[_], h = r[_ + 1], w = (d - u.value) / (h.value - u.value), b = p(f(u.color), f(h.color), w);
+      n[l * 4] = b[0], n[l * 4 + 1] = b[1], n[l * 4 + 2] = b[2], n[l * 4 + 3] = 255;
     }
     t.bindTexture(t.TEXTURE_2D, this.colormapTexture), t.texImage2D(t.TEXTURE_2D, 0, t.RGBA, i, 1, 0, t.RGBA, t.UNSIGNED_BYTE, n), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_MIN_FILTER, t.LINEAR), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_S, t.CLAMP_TO_EDGE), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_T, t.CLAMP_TO_EDGE);
   }
@@ -173,7 +173,7 @@ class H {
     this.gl && (this.program && this.gl.deleteProgram(this.program), this.vertexBuffer && this.gl.deleteBuffer(this.vertexBuffer), this.indexBuffer && this.gl.deleteBuffer(this.indexBuffer), this.dataTexture && this.gl.deleteTexture(this.dataTexture), this.colormapTexture && this.gl.deleteTexture(this.colormapTexture));
   }
 }
-const I = {
+const H = {
   arome1: {
     type: "latlon",
     proj_params: {
@@ -601,7 +601,7 @@ const I = {
   mm_hr_to_cm_hr: (a) => a / 10,
   cm_hr_to_mm_hr: (a) => a * 10
 };
-function F(a, e) {
+function I(a, e) {
   const t = {
     "°c": "c",
     "°f": "f",
@@ -631,12 +631,12 @@ function F(a, e) {
     "cm/hr": "cmhr",
     in: "in",
     inches: "in"
-  }, i = (s) => {
-    if (!s) return "";
-    const c = s.toLowerCase().trim();
+  }, i = (o) => {
+    if (!o) return "";
+    const c = o.toLowerCase().trim();
     return t[c] || c;
-  }, n = i(a), r = i(e), o = `${n}_to_${r}`;
-  return U[o] || null;
+  }, n = i(a), r = i(e), s = `${n}_to_${r}`;
+  return U[s] || null;
 }
 const D = {
   mrms: {
@@ -12859,25 +12859,25 @@ function M(a, e) {
   for (const n of i) {
     const r = t[n];
     if (!r) continue;
-    const o = Object.keys(r).sort((s, c) => c.localeCompare(s));
-    if (o.length > 0) return { date: n, run: o[0] };
+    const s = Object.keys(r).sort((o, c) => c.localeCompare(o));
+    if (s.length > 0) return { date: n, run: s[0] };
   }
   return null;
 }
 class B extends A {
   constructor(e, t = {}) {
     if (super(), !e) throw new Error("A Mapbox GL map instance is required.");
-    this.map = e, this.layers = /* @__PURE__ */ new Map(), this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
+    this.map = e, this.layers = /* @__PURE__ */ new Map(), this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.dataCache = /* @__PURE__ */ new Map(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
     const i = t.layerOptions || {}, n = !!i.colormap;
     if (this.baseLayerOptions = {
       ...i,
       customColormap: n,
       colormapBaseUnit: i.colormapBaseUnit || "fahrenheit"
     }, !n) {
-      const r = i.variable || "2t_2", o = R.variable_cmap?.[r] || r, s = L[o];
-      if (s) {
-        const c = Object.keys(s.units)[0];
-        this.baseLayerOptions.colormap = s.units[c].colormap, this.baseLayerOptions.colormapBaseUnit = c;
+      const r = i.variable || "2t_2", s = R.variable_cmap?.[r] || r, o = L[s];
+      if (o) {
+        const c = Object.keys(o.units)[0];
+        this.baseLayerOptions.colormap = o.units[c].colormap, this.baseLayerOptions.colormapBaseUnit = c;
       } else
         console.warn(`[Manager] No default colormap found for initial variable "${r}".`), this.baseLayerOptions.colormap = [0, "#000000", 1, "#ffffff"];
     }
@@ -12892,27 +12892,40 @@ class B extends A {
       units: t.initialUnit || "imperial"
     }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
   }
+  // --- START OF FIX ---
+  /**
+   * NEW METHOD: A central router for all messages coming from the web worker.
+   * It uses the requestId to resolve the correct promise.
+   * @private
+   */
+  _handleWorkerMessage(e) {
+    const { success: t, requestId: i, decompressedData: n, encoding: r, error: s } = e.data;
+    if (this.workerResolvers.has(i)) {
+      const { resolve: o, reject: c } = this.workerResolvers.get(i);
+      t ? o({ data: n, encoding: r }) : c(new Error(s)), this.workerResolvers.delete(i);
+    }
+  }
   _convertColormapUnits(e, t, i) {
     if (t === i) return e;
-    const n = F(t, i);
+    const n = I(t, i);
     if (!n) return e;
     const r = [];
-    for (let o = 0; o < e.length; o += 2)
-      r.push(n(e[o]), e[o + 1]);
+    for (let s = 0; s < e.length; s += 2)
+      r.push(n(e[s]), e[s + 1]);
     return r;
   }
   _updateOrCreateLayer(e, t, i, n) {
-    const { model: r, colormap: o, opacity: s = 1, visible: c = !0, units: f, variable: d } = t, _ = I[r];
+    const { model: r, colormap: s, opacity: o = 1, visible: c = !0, units: f, variable: p } = t, _ = H[r];
     if (!_) {
       console.error(`No grid configuration found for model: ${r}`);
       return;
     }
-    const l = t.colormapBaseUnit || "fahrenheit", u = R.fld[d] || {}, m = this._getTargetUnit(u.defaultUnit, f), h = this._convertColormapUnits(o, l, m), b = [h[0], h[h.length - 2]], v = u.defaultUnit || "none", y = this.layers.has(e), x = y ? this.layers.get(e).shaderLayer : new H(e);
-    if (!y) {
+    const l = t.colormapBaseUnit || "fahrenheit", d = R.fld[p] || {}, u = this._getTargetUnit(d.defaultUnit, f), h = this._convertColormapUnits(s, l, u), w = [h[0], h[h.length - 2]], b = d.defaultUnit || "none", g = this.layers.has(e), x = g ? this.layers.get(e).shaderLayer : new F(e);
+    if (!g) {
       const T = "AML_-_terrain";
       this.map.getLayer(T) ? this.map.addLayer(x, T) : this.map.addLayer(x), this.layers.set(e, { id: e, shaderLayer: x, options: t, visible: c });
     }
-    x.updateDataTexture(i, n, _.grid_params.nx, _.grid_params.ny), x.updateColormapTexture(h), x.updateStyle({ opacity: c ? s : 0, dataRange: b }), x.setUnitConversion(v, f), this.map.triggerRepaint();
+    x.updateDataTexture(i, n, _.grid_params.nx, _.grid_params.ny), x.updateColormapTexture(h), x.updateStyle({ opacity: c ? o : 0, dataRange: w }), x.setUnitConversion(b, f), this.map.triggerRepaint();
   }
   /**
    * Helper to determine the target unit string for a given system.
@@ -12947,15 +12960,15 @@ class B extends A {
     }
   }
   async setState(e) {
-    const t = e.model && e.model !== this.state.model, i = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run);
-    Object.assign(this.state, e);
-    const n = await this._loadGridData(this.state);
-    if (n && n.data) {
-      const r = { ...this.baseLayerOptions, ...this.state };
-      this._updateOrCreateLayer(this.layerId, r, n.data, n.encoding);
+    const t = e.model && e.model !== this.state.model, i = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), n = e.variable && e.variable !== this.state.variable;
+    (t || i || n) && this.dataCache.clear(), Object.assign(this.state, e);
+    const r = await this._loadGridData(this.state);
+    if (r && r.data) {
+      const s = { ...this.baseLayerOptions, ...this.state };
+      this._updateOrCreateLayer(this.layerId, s, r.data, r.encoding);
     } else
       this.removeLayer(this.layerId);
-    this.emit("state:change", this.state), (t || i) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
+    this.emit("state:change", this.state), (t || i || n) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
   }
   async setModel(e) {
     if (e === this.state.model) return;
@@ -12971,25 +12984,21 @@ class B extends A {
       forecastHour: 0
     }) : console.error(`[Manager] No runs found for model "${e}".`);
   }
-  // ... (All other methods like initialize, loadGridData, createWorker, etc., are unchanged) ...
   createWorker() {
     const e = `
             import { decompress } from 'https://cdn.skypack.dev/fzstd@0.1.1';
 
             self.onmessage = async (e) => {
-                const { compressedData, encoding } = e.data;
+                const { requestId, compressedData, encoding } = e.data;
                 try {
                     const decompressedDeltas = decompress(compressedData);
                     const expectedLength = encoding.length;
                     const reconstructedData = new Int8Array(expectedLength);
 
                     if (decompressedDeltas.length > 0 && expectedLength > 0) {
-                        // The first value is absolute
                         reconstructedData[0] = decompressedDeltas[0] > 127 
                             ? decompressedDeltas[0] - 256 
                             : decompressedDeltas[0];
-
-                        // Subsequent values are deltas from the previous value
                         for (let i = 1; i < expectedLength; i++) {
                             const delta = decompressedDeltas[i] > 127 
                                 ? decompressedDeltas[i] - 256 
@@ -12999,10 +13008,22 @@ class B extends A {
                     }
 
                     const finalData = new Uint8Array(reconstructedData.buffer);
-                    self.postMessage({ success: true, decompressedData: finalData }, [finalData.buffer]);
+                    
+                    // Respond with the ID, the result, and the original encoding object.
+                    self.postMessage({ 
+                        success: true, 
+                        requestId: requestId, 
+                        decompressedData: finalData,
+                        encoding: encoding 
+                    }, [finalData.buffer]);
 
                 } catch (error) {
-                    self.postMessage({ success: false, error: error.message });
+                    // If it fails, still include the ID so the main thread knows which request failed.
+                    self.postMessage({ 
+                        success: false, 
+                        requestId: requestId, 
+                        error: error.message 
+                    });
                 }
             };
         `, t = new Blob([e], { type: "application/javascript" });
@@ -13013,13 +13034,14 @@ class B extends A {
    * This is used by the 'preload' load strategy.
    * @private
    */
+  // Replace the existing _preloadCurrentRun method with this one.
   async _preloadCurrentRun() {
     const { model: e, date: t, run: i } = this.state, n = this.modelStatus?.[e]?.[t]?.[i];
     if (!n || n.length === 0)
       return;
-    const r = n.map((o) => {
-      const s = { ...this.state, forecastHour: o };
-      return this._loadGridData(s);
+    const r = n.map((s) => {
+      const o = { ...this.state, forecastHour: s };
+      return this._loadGridData(o);
     });
     await Promise.all(r);
   }
@@ -13058,24 +13080,21 @@ class B extends A {
     this.autoRefreshIntervalId && (clearInterval(this.autoRefreshIntervalId), this.autoRefreshIntervalId = null);
   }
   async _loadGridData(e) {
-    const { model: t, date: i, run: n, forecastHour: r, variable: o, smoothing: s } = { ...this.baseLayerOptions, ...e }, c = `${t}-${i}-${n}-${r}-${o}-${s}`, f = `${this.baseUrl}/${t}/${i}/${n}/${r}/${o}/${s}`;
-    try {
-      const d = await fetch(f);
-      if (!d.ok) throw new Error(`HTTP ${d.status}`);
-      const { data: _, encoding: l } = await d.json(), u = Uint8Array.from(atob(_), (m) => m.charCodeAt(0));
-      return new Promise((m) => {
-        const h = (b) => {
-          if (this.worker.removeEventListener("message", h), b.data.success) {
-            const v = { data: b.data.decompressedData, encoding: l };
-            m(v);
-          } else
-            console.error("Worker failed:", b.data.error), m(null);
-        };
-        this.worker.addEventListener("message", h), this.worker.postMessage({ compressedData: u, encoding: l }, [u.buffer]);
-      });
-    } catch (d) {
-      return console.warn(`Failed to fetch data for ${c}:`, d.message), null;
-    }
+    const { model: t, date: i, run: n, forecastHour: r, variable: s, smoothing: o } = { ...this.baseLayerOptions, ...e }, c = `${t}-${i}-${n}-${r}-${s}-${o || ""}`;
+    if (this.dataCache.has(c))
+      return this.dataCache.get(c);
+    const f = new Promise(async (p, _) => {
+      const l = `${this.baseUrl}/${t}/${i}/${n}/${r}/${s}/${o}`;
+      try {
+        const d = await fetch(l);
+        if (!d.ok) throw new Error(`HTTP ${d.status} for ${l}`);
+        const { data: u, encoding: h } = await d.json(), w = Uint8Array.from(atob(u), (g) => g.charCodeAt(0)), b = this.workerRequestId++;
+        this.workerResolvers.set(b, { resolve: p, reject: _ }), this.worker.postMessage({ requestId: b, compressedData: w, encoding: h }, [w.buffer]);
+      } catch (d) {
+        _(d);
+      }
+    }).then((p) => (this.dataCache.set(c, p), p)).catch((p) => (this.dataCache.delete(c), null));
+    return this.dataCache.set(c, f), f;
   }
   async setUnits(e) {
     e === this.state.units || !["metric", "imperial"].includes(e) || await this.setState({ units: e });
@@ -13188,7 +13207,7 @@ const W = {
 }, P = {
   light: W,
   dark: N
-}, p = {
+}, m = {
   // Background and water layers
   landColor: { layerId: "AML_-_land" },
   oceanColor: { layerId: "AML_-_water" },
@@ -13215,27 +13234,27 @@ const W = {
   // Assuming point label for natural features
   subdivisionLabels: { layerId: "AML_-_subdivision-label" }
 };
-function w(a) {
+function y(a) {
   return typeof a == "string" && a.startsWith("#") && a.length === 9 ? a.substring(0, 7) : a;
 }
 const k = (a, e, t) => {
-  if (a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "line-color", w(t.color)), a.setPaintProperty(e, "line-width", t.width), t.lineType)) {
+  if (a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "line-color", y(t.color)), a.setPaintProperty(e, "line-width", t.width), t.lineType)) {
     const i = { dashed: [2, 2], dotted: [0, 2], solid: [] };
     a.setPaintProperty(e, "line-dasharray", i[t.lineType] || []);
   }
-}, g = (a, e, t) => {
-  a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "text-color", w(t.color)), a.setPaintProperty(e, "text-halo-color", w(t.outlineColor)), a.setPaintProperty(e, "text-halo-width", t.outlineWidth), a.setLayoutProperty(e, "text-size", t.fontSize), a.setLayoutProperty(e, "text-font", [t.fontFamily]));
+}, v = (a, e, t) => {
+  a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "text-color", y(t.color)), a.setPaintProperty(e, "text-halo-color", y(t.outlineColor)), a.setPaintProperty(e, "text-halo-width", t.outlineWidth), a.setLayoutProperty(e, "text-size", t.fontSize), a.setLayoutProperty(e, "text-font", [t.fontFamily]));
 };
 function E(a, e, t, i) {
-  i && a.getLayer(e) && (i.color && a.setPaintProperty(e, t, w(i.color)), i.visible !== void 0 && a.setLayoutProperty(e, "visibility", i.visible ? "visible" : "none"));
+  i && a.getLayer(e) && (i.color && a.setPaintProperty(e, t, y(i.color)), i.visible !== void 0 && a.setLayoutProperty(e, "visibility", i.visible ? "visible" : "none"));
 }
 function z(a, e) {
   if (!(!a || !a.isStyleLoaded())) {
     if (e.landOcean) {
       const { landColor: t, oceanColor: i, waterDepth: n, nationalPark: r } = e.landOcean;
-      a.getLayer(p.landColor.layerId) && a.setPaintProperty(p.landColor.layerId, "background-color", w(t)), a.getLayer(p.oceanColor.layerId) && a.setPaintProperty(p.oceanColor.layerId, "fill-color", w(i)), E(a, p.waterDepth.layerId, "fill-color", n), E(a, p.nationalPark.layerId, "fill-color", r);
+      a.getLayer(m.landColor.layerId) && a.setPaintProperty(m.landColor.layerId, "background-color", y(t)), a.getLayer(m.oceanColor.layerId) && a.setPaintProperty(m.oceanColor.layerId, "fill-color", y(i)), E(a, m.waterDepth.layerId, "fill-color", n), E(a, m.nationalPark.layerId, "fill-color", r);
     }
-    e.transportation && (k(a, p.roads.layerId, e.transportation.roads), k(a, p.airports.layerId, e.transportation.airports)), e.boundaries && (k(a, p.countries.layerId, e.boundaries.countries), k(a, p.states.layerId, e.boundaries.states), k(a, p.counties.layerId, e.boundaries.counties)), e.waterFeatures && k(a, p.waterways.layerId, e.waterFeatures.waterways), e.labels && (g(a, p.continents.layerId, e.labels.continents), g(a, p.countriesLabels.layerId, e.labels.countries), g(a, p.statesLabels.layerId, e.labels.states), g(a, p.citiesMajor.layerId, e.labels.cities.major), g(a, p.citiesMinor.layerId, e.labels.cities.minor), g(a, p.airportsLabels.layerId, e.labels.airports), g(a, p.poi.layerId, e.labels.poi), g(a, p.waterLabels.layerId, e.labels.waterLabels), g(a, p.naturalLabels.layerId, e.labels.naturalLabels), g(a, p.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && a.getSource("mapbox-dem") && (e.terrain.visible ? (a.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), a.getLayer("hillshade") && (a.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), a.setPaintProperty("hillshade", "hillshade-shadow-color", w(e.terrain.shadowColor)), a.setPaintProperty("hillshade", "hillshade-highlight-color", w(e.terrain.highlightColor)), a.setPaintProperty("hillshade", "hillshade-accent-color", w(e.terrain.accentColor)))) : a.setTerrain(null));
+    e.transportation && (k(a, m.roads.layerId, e.transportation.roads), k(a, m.airports.layerId, e.transportation.airports)), e.boundaries && (k(a, m.countries.layerId, e.boundaries.countries), k(a, m.states.layerId, e.boundaries.states), k(a, m.counties.layerId, e.boundaries.counties)), e.waterFeatures && k(a, m.waterways.layerId, e.waterFeatures.waterways), e.labels && (v(a, m.continents.layerId, e.labels.continents), v(a, m.countriesLabels.layerId, e.labels.countries), v(a, m.statesLabels.layerId, e.labels.states), v(a, m.citiesMajor.layerId, e.labels.cities.major), v(a, m.citiesMinor.layerId, e.labels.cities.minor), v(a, m.airportsLabels.layerId, e.labels.airports), v(a, m.poi.layerId, e.labels.poi), v(a, m.waterLabels.layerId, e.labels.waterLabels), v(a, m.naturalLabels.layerId, e.labels.naturalLabels), v(a, m.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && a.getSource("mapbox-dem") && (e.terrain.visible ? (a.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), a.getLayer("hillshade") && (a.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), a.setPaintProperty("hillshade", "hillshade-shadow-color", y(e.terrain.shadowColor)), a.setPaintProperty("hillshade", "hillshade-highlight-color", y(e.terrain.highlightColor)), a.setPaintProperty("hillshade", "hillshade-accent-color", y(e.terrain.accentColor)))) : a.setTerrain(null));
   }
 }
 function S(a, e) {
@@ -13300,8 +13319,8 @@ class O extends A {
         return;
       }
     n[r[r.length - 1]] = t;
-    const o = e.replace(/\.(.)/g, (c, f) => f.toUpperCase()), s = p[o]?.layerId;
-    s && this.map.getLayer(s) ? (this.map.setLayoutProperty(s, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${s} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${o})`);
+    const s = e.replace(/\.(.)/g, (c, f) => f.toUpperCase()), o = m[s]?.layerId;
+    o && this.map.getLayer(o) ? (this.map.setLayoutProperty(o, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${o} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${s})`);
   }
   addWeatherManager(e) {
     this.weatherLayerManagers.set(e.layerId, e);
@@ -13329,16 +13348,16 @@ class G {
       this.selectElement.innerHTML = "<option>Model offline</option>", this.selectElement.disabled = !0;
       return;
     }
-    const o = [];
-    for (const s in r)
-      for (const c in r[s])
-        o.push({ date: s, run: c });
-    o.sort((s, c) => {
-      const f = c.date.localeCompare(s.date);
-      return f !== 0 ? f : c.run.localeCompare(s.run);
-    }), this.selectElement.innerHTML = "", o.forEach(({ date: s, run: c }) => {
+    const s = [];
+    for (const o in r)
+      for (const c in r[o])
+        s.push({ date: o, run: c });
+    s.sort((o, c) => {
+      const f = c.date.localeCompare(o.date);
+      return f !== 0 ? f : c.run.localeCompare(o.run);
+    }), this.selectElement.innerHTML = "", s.forEach(({ date: o, run: c }) => {
       const f = document.createElement("option");
-      f.value = `${s}:${c}`, f.textContent = this.options.runFormatter(s, c), this.selectElement.appendChild(f);
+      f.value = `${o}:${c}`, f.textContent = this.options.runFormatter(o, c), this.selectElement.appendChild(f);
     }), this.selectElement.value = `${i}:${n}`, this.selectElement.disabled = !1;
   }
   /**
@@ -13426,8 +13445,8 @@ class $ {
       this.sliderElement.disabled = !0, this.sliderElement.max = 0, this.displayElement.textContent = "N/A";
       return;
     }
-    const o = r.indexOf(n);
-    this.sliderElement.max = r.length - 1, this.sliderElement.value = o >= 0 ? o : 0, this.displayElement.textContent = n, this.sliderElement.disabled = !1;
+    const s = r.indexOf(n);
+    this.sliderElement.max = r.length - 1, this.sliderElement.value = s >= 0 ? s : 0, this.displayElement.textContent = n, this.sliderElement.disabled = !1;
   }
   /**
    * The function that performs the expensive state update.
@@ -13450,9 +13469,9 @@ class $ {
             <label class="aguacero-panel-label">${this.options.label}: +<span class="aguacero-slider-display">0</span>hr</label>
             <input type="range" class="aguacero-slider-input" min="0" max="0" value="0" step="1" disabled>
         `, this.sliderElement = this.element.querySelector("input"), this.displayElement = this.element.querySelector("span"), this.sliderElement.addEventListener("input", (i) => {
-      const { model: n, date: r, run: o } = this.manager.state, s = this.manager.modelStatus[n][r][o];
-      if (!s) return;
-      const c = s[parseInt(i.target.value, 10)];
+      const { model: n, date: r, run: s } = this.manager.state, o = this.manager.modelStatus[n][r][s];
+      if (!o) return;
+      const c = o[parseInt(i.target.value, 10)];
       this.displayElement.textContent = c, this.latestForecastHour = c, this.pendingUpdate || (this.pendingUpdate = !0, requestAnimationFrame(() => this._performUpdate()));
     }), this.manager.on("state:change", () => this._update()), t.appendChild(this.element), this;
   }
@@ -13493,13 +13512,13 @@ class q {
       n.innerHTML = `
                 <label for="${r}">${i.label}</label>
                 <input type="checkbox" id="${r}" data-key="${i.key}">
-            `, n.querySelector("input").addEventListener("change", (s) => {
-        this.manager.setLabelGroupVisibility(s.target.dataset.key, s.target.checked);
+            `, n.querySelector("input").addEventListener("change", (o) => {
+        this.manager.setLabelGroupVisibility(o.target.dataset.key, o.target.checked);
       }), this.element.appendChild(n);
     }), this.manager.on("style:applied", ({ styles: i }) => {
       this.element.querySelectorAll('input[type="checkbox"]').forEach((n) => {
-        const [r, o] = n.dataset.key.split("."), s = i.labels?.[r]?.[o]?.visible;
-        s !== void 0 && (n.checked = s);
+        const [r, s] = n.dataset.key.split("."), o = i.labels?.[r]?.[s]?.visible;
+        o !== void 0 && (n.checked = o);
       });
     }), this.buttons.forEach((i) => {
       i.addEventListener("click", (n) => {
@@ -13590,9 +13609,9 @@ class Z {
    */
   _update(e) {
     if (!this.element) return;
-    const { colormap: t, colormapBaseUnit: i } = this.manager.baseLayerOptions, n = R.fld[e.variable] || {}, r = n.variable || "Legend", { units: o } = e, s = Object.keys(n.units || {})[0] || "", c = this._generateStopsHtml(t, i, o);
+    const { colormap: t, colormapBaseUnit: i } = this.manager.baseLayerOptions, n = R.fld[e.variable] || {}, r = n.variable || "Legend", { units: s } = e, o = Object.keys(n.units || {})[0] || "", c = this._generateStopsHtml(t, i, s);
     this.element.innerHTML = `
-            <h3 class="aguacero-legend-title">${r} (${s})</h3>
+            <h3 class="aguacero-legend-title">${r} (${o})</h3>
             <div class="aguacero-legend-body">${c}</div>
         `;
   }
@@ -13608,18 +13627,18 @@ class Z {
     for (let _ = 0; _ < e.length; _ += 2)
       n.push({ value: e[_], color: e[_ + 1] });
     if (n.length < 2) return "";
-    const r = n[0].value, s = n[n.length - 1].value - r, c = this.options.stops, f = this._getTargetUnitForLegend(t, i);
-    let d = "";
+    const r = n[0].value, o = n[n.length - 1].value - r, c = this.options.stops, f = this._getTargetUnitForLegend(t, i);
+    let p = "";
     for (let _ = c - 1; _ >= 0; _--) {
-      const l = r + _ / (c - 1) * s, u = this._getColorForValue(l, n);
-      let m = l;
-      const h = F(t, f);
-      h && (m = h(l)), d += `<div class="aguacero-legend-row">
-                <span class="aguacero-legend-swatch" style="background-color: ${u};"></span>
-                <span class="aguacero-legend-label">${this.options.labelFormatter(m)}</span>
+      const l = r + _ / (c - 1) * o, d = this._getColorForValue(l, n);
+      let u = l;
+      const h = I(t, f);
+      h && (u = h(l)), p += `<div class="aguacero-legend-row">
+                <span class="aguacero-legend-swatch" style="background-color: ${d};"></span>
+                <span class="aguacero-legend-label">${this.options.labelFormatter(u)}</span>
             </div>`;
     }
-    return d;
+    return p;
   }
   _getTargetUnitForLegend(e, t) {
     const i = e.toLowerCase();
@@ -13635,13 +13654,13 @@ class Z {
    */
   _getColorForValue(e, t) {
     let i = t[0], n = t[t.length - 1];
-    for (let y = 0; y < t.length - 1; y++)
-      if (e >= t[y].value && e <= t[y + 1].value) {
-        i = t[y], n = t[y + 1];
+    for (let g = 0; g < t.length - 1; g++)
+      if (e >= t[g].value && e <= t[g + 1].value) {
+        i = t[g], n = t[g + 1];
         break;
       }
-    const r = n.value - i.value, o = r === 0 ? 0 : (e - i.value) / r, s = parseInt(i.color.slice(1), 16), c = parseInt(n.color.slice(1), 16), f = s >> 16 & 255, d = s >> 8 & 255, _ = s & 255, l = c >> 16 & 255, u = c >> 8 & 255, m = c & 255, h = Math.round(f * (1 - o) + l * o), b = Math.round(d * (1 - o) + u * o), v = Math.round(_ * (1 - o) + m * o);
-    return `rgb(${h},${b},${v})`;
+    const r = n.value - i.value, s = r === 0 ? 0 : (e - i.value) / r, o = parseInt(i.color.slice(1), 16), c = parseInt(n.color.slice(1), 16), f = o >> 16 & 255, p = o >> 8 & 255, _ = o & 255, l = c >> 16 & 255, d = c >> 8 & 255, u = c & 255, h = Math.round(f * (1 - s) + l * s), w = Math.round(p * (1 - s) + d * s), b = Math.round(_ * (1 - s) + u * s);
+    return `rgb(${h},${w},${b})`;
   }
 }
 class J {
@@ -13662,8 +13681,8 @@ class J {
     return t.vars.forEach((n) => {
       const r = R.fld[n];
       if (!r) return;
-      const { category: o, subCategory: s, variable: c } = r;
-      i[o] || (i[o] = {}), i[o][s] || (i[o][s] = []), i[o][s].push({ id: n, name: c });
+      const { category: s, subCategory: o, variable: c } = r;
+      i[s] || (i[s] = {}), i[s][o] || (i[s][o] = []), i[s][o].push({ id: n, name: c });
     }), i;
   }
   /**
@@ -13682,8 +13701,8 @@ class J {
         t += `<div class="aguacero-layer-subcategory">
                     <div class="aguacero-layer-subheader">${n}</div>
                     <div class="aguacero-layer-items">`, e[i][n].forEach((r) => {
-          const o = r.id === this.manager.state.variable ? "active" : "";
-          t += `<div class="aguacero-layer-item ${o}" data-variable-id="${r.id}">${r.name}</div>`;
+          const s = r.id === this.manager.state.variable ? "active" : "";
+          t += `<div class="aguacero-layer-item ${s}" data-variable-id="${r.id}">${r.name}</div>`;
         }), t += "</div></div>";
       t += "</div></div>";
     }
