@@ -9,7 +9,8 @@ import {
     RunSelectorPanel, 
     ForecastSliderPanel, 
     ThemeControlPanel,
-    LabelControlPanel
+    LabelControlPanel,
+    UnitControlPanel
 } from './UI.js';
 
 // Re-export them from this single file.
@@ -19,5 +20,6 @@ export {
     RunSelectorPanel,
     ForecastSliderPanel,
     ThemeControlPanel,
-    LabelControlPanel
+    LabelControlPanel,
+    UnitControlPanel
 };

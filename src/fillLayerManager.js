@@ -3,6 +3,7 @@
 import { EventEmitter } from './events.js';
 import { GridRenderLayer } from './GridRenderLayer.js';
 import { COORDINATE_CONFIGS } from './coordinate_configs.js';
+import { getUnitConversionFunction } from './unitConversions.js';
 
 /**
  * Finds the latest available date and run for a specific model from the model status data.
@@ -59,10 +60,32 @@ export class FillLayerManager extends EventEmitter {
             forecastHour: 0,
             visible: true,
             opacity: options.layerOptions?.opacity ?? 1,
+            units: 'imperial'
         };
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
         this.autoRefreshIntervalId = null;
+    }
+
+    _convertColormapUnits(colormap, fromUnits, toUnits) {
+        if (fromUnits === toUnits) {
+            return colormap;
+        }
+
+        // Use the conversion utility you provided
+        const conversionFunc = getUnitConversionFunction(fromUnits, toUnits);
+        if (!conversionFunc) {
+            console.warn(`No unit conversion function found from "${fromUnits}" to "${toUnits}".`);
+            return colormap;
+        }
+
+        const newColormap = [];
+        for (let i = 0; i < colormap.length; i += 2) {
+            const originalValue = colormap[i];
+            const color = colormap[i + 1];
+            newColormap.push(conversionFunc(originalValue), color);
+        }
+        return newColormap;
     }
 
     /**
@@ -224,56 +247,65 @@ export class FillLayerManager extends EventEmitter {
     }
 
     _updateOrCreateLayer(id, options, decompressedData, encoding) {
-        const { model, colormap, opacity = 1, visible = true } = options;
+        const { model, colormap, opacity = 1, visible = true, units } = options;
         const gridConfig = COORDINATE_CONFIGS[model];
         if (!gridConfig) {
             console.error(`No grid configuration found for model: ${model}`);
             return;
         }
-        const grid = gridConfig.grid_params;
-        const dataRange = [colormap[0], colormap[colormap.length - 2]];
 
-        // Check if the layer already exists
+        const baseUnit = 'fahrenheit';
+        const targetUnit = units === 'metric' ? 'celsius' : 'fahrenheit';
+        const convertedColormap = this._convertColormapUnits(colormap, baseUnit, targetUnit);
+        const dataRange = [convertedColormap[0], convertedColormap[convertedColormap.length - 2]];
+
         if (this.layers.has(id)) {
-            // --- UPDATE PATH ---
-            // The layer exists, so we just update its data.
             const layerInfo = this.layers.get(id);
             const shaderLayer = layerInfo.shaderLayer;
 
-            // Update the data texture and style properties
-            shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
+            shaderLayer.updateDataTexture(decompressedData, encoding, gridConfig.grid_params.nx, gridConfig.grid_params.ny);
+            shaderLayer.updateColormapTexture(convertedColormap);
             shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
             
-        } else {
-            // --- CREATE PATH ---
-            // The layer does not exist, so we create it.
-            const shaderLayer = new GridRenderLayer(id);
-            
-            // --- THIS IS THE MODIFIED LOGIC ---
-            const beforeId = 'AML_-_terrain'; // The ID of the layer we want to be UNDER.
+            // --- CORRECTED: Use the simpler method call ---
+            shaderLayer.setUnitConversion(units);
 
-            // To prevent errors, we first check if the 'before' layer exists in the map style.
+        } else {
+            const shaderLayer = new GridRenderLayer(id);
+            const beforeId = 'AML_-_terrain';
+
             if (this.map.getLayer(beforeId)) {
-                // If it exists, add our new layer just before it.
                 this.map.addLayer(shaderLayer, beforeId);
             } else {
-                // As a fallback, if the terrain layer isn't found, add the layer to the top.
-                // This prevents the map from crashing if a different style is used.
                 console.warn(`AguaceroAPI: Layer '${beforeId}' not found. Adding weather layer to the top.`);
                 this.map.addLayer(shaderLayer);
             }
-            // --- END OF MODIFICATION ---
-
+            
             this.layers.set(id, { id, shaderLayer, options, visible });
 
-            // Set its initial data and style
-            shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
-            shaderLayer.updateColormapTexture(colormap);
+            shaderLayer.updateDataTexture(decompressedData, encoding, gridConfig.grid_params.nx, gridConfig.grid_params.ny);
+            shaderLayer.updateColormapTexture(convertedColormap);
             shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
+
+            // --- CORRECTED: Use the simpler method call ---
+            shaderLayer.setUnitConversion(units);
         }
 
-        // In both cases, trigger a repaint to show the changes.
         this.map.triggerRepaint();
+    }
+
+    /**
+     * 4. NEW PUBLIC METHOD: Sets the unit system for the layer.
+     * @param {'metric'|'imperial'} newUnits - The desired unit system.
+     */
+    async setUnits(newUnits) {
+        if (newUnits === this.state.units || !['metric', 'imperial'].includes(newUnits)) {
+            return; // No change needed or invalid unit
+        }
+
+        // Calling setState will update the state and trigger a re-render
+        // with the new unit-converted colormap and shader uniforms.
+        await this.setState({ units: newUnits });
     }
     
     /**
@@ -291,10 +323,10 @@ export class FillLayerManager extends EventEmitter {
 
         Object.assign(this.state, newState);
 
-        // This part remains the same, but it will now benefit from the corrected cache logic.
         const grid = await this._loadGridData(this.state);
         
         if (grid && grid.data) {
+            // The state now includes 'units', so fullOptions will have it.
             const fullOptions = { ...this.baseLayerOptions, ...this.state };
             this._updateOrCreateLayer(this.layerId, fullOptions, grid.data, grid.encoding);
         } else {

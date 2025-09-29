@@ -310,3 +310,63 @@ export class LabelControlPanel {
         return this;
     }
 }
+
+export class UnitControlPanel {
+    /**
+     * Creates an instance of UnitControlPanel.
+     * @param {FillLayerManager} manager - The main controller instance.
+     * @param {object} [options={}] - Customization options.
+     * @param {'imperial'|'metric'} [options.initialUnit='imperial'] - The unit system to start with.
+     */
+    constructor(manager, options = {}) {
+        this.manager = manager;
+        this.element = null;
+        this.options = {
+            initialUnit: options.initialUnit || 'imperial',
+        };
+    }
+
+    /**
+     * Renders the panel and appends it to a target DOM element.
+     * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
+     * @returns {this} The instance for chaining.
+     */
+    addTo(target) {
+        const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
+        if (!targetElement) {
+            throw new Error(`AguaceroAPI Error: The target element "${target}" for UnitControlPanel could not be found.`);
+        }
+
+        this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-unit-control';
+        this.element.innerHTML = `
+            <div class="aguacero-panel-label">Units</div>
+            <div class="aguacero-button-group">
+                <button data-unit="imperial" class="aguacero-button">Imperial</button>
+                <button data-unit="metric" class="aguacero-button">Metric</button>
+            </div>
+        `;
+
+        this.buttons = this.element.querySelectorAll('button');
+        this.buttons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const newUnit = e.target.dataset.unit;
+                // Call the new setUnits method on the FillLayerManager
+                this.manager.setUnits(newUnit);
+            });
+        });
+
+        // Listen for state changes to update which button is active
+        this.manager.on('state:change', ({ units }) => {
+            this.buttons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.unit === units);
+            });
+        });
+
+        // Set the initial state when the panel is added
+        this.manager.setUnits(this.options.initialUnit);
+
+        targetElement.appendChild(this.element);
+        return this;
+    }
+}
