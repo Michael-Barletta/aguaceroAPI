@@ -60,7 +60,9 @@ export class FillLayerManager extends EventEmitter {
             visible: true,
             opacity: 0.7,
         };
-        this.autoRefreshInterval = null;
+        this.autoRefreshEnabled = options.autoRefresh ?? false;
+        this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
+        this.autoRefreshIntervalId = null;
     }
 
     /**
@@ -136,25 +138,28 @@ export class FillLayerManager extends EventEmitter {
         return this.modelStatus;
     }
 
-    /**
-     * Starts an interval to automatically refresh the model status data.
-     * @param {number} [intervalMinutes=1] - The refresh interval in minutes.
-     */
-    startAutoRefresh(intervalMinutes = 1) {
+    startAutoRefresh(intervalSeconds) {
+        // --- MODIFICATION: Changed parameter name for clarity ---
+        const interval = intervalSeconds ?? this.autoRefreshIntervalSeconds ?? 60;
+        
         this.stopAutoRefresh();
-        this.autoRefreshInterval = setInterval(async () => {
+        
+        // --- MODIFICATION: Updated log message ---
+        console.log(`[FillLayerManager] Starting auto-refresh every ${interval} second(s).`);
+        
+        this.autoRefreshIntervalId = setInterval(async () => {
+            console.log('[FillLayerManager] Auto-refresh triggered: fetching latest model status.');
             await this.fetchModelStatus(true);
             this.emit('state:change', this.state);
-        }, intervalMinutes * 60 * 1000);
+        // --- MODIFICATION: Changed calculation from minutes to seconds ---
+        }, interval * 1000);
     }
 
-    /**
-     * Stops the automatic refresh interval.
-     */
     stopAutoRefresh() {
-        if (this.autoRefreshInterval) {
-            clearInterval(this.autoRefreshInterval);
-            this.autoRefreshInterval = null;
+        if (this.autoRefreshIntervalId) {
+            clearInterval(this.autoRefreshIntervalId);
+            this.autoRefreshIntervalId = null;
+            console.log('[FillLayerManager] Auto-refresh stopped.');
         }
     }
 
@@ -249,8 +254,6 @@ export class FillLayerManager extends EventEmitter {
         const grid = gridConfig.grid_params;
         const dataRange = [colormap[0], colormap[colormap.length - 2]];
 
-        // --- REFACTORED LOGIC ---
-
         // Check if the layer already exists
         if (this.layers.has(id)) {
             // --- UPDATE PATH ---
@@ -266,7 +269,22 @@ export class FillLayerManager extends EventEmitter {
             // --- CREATE PATH ---
             // The layer does not exist, so we create it.
             const shaderLayer = new GridRenderLayer(id);
-            this.map.addLayer(shaderLayer);
+            
+            // --- THIS IS THE MODIFIED LOGIC ---
+            const beforeId = 'AML_-_terrain'; // The ID of the layer we want to be UNDER.
+
+            // To prevent errors, we first check if the 'before' layer exists in the map style.
+            if (this.map.getLayer(beforeId)) {
+                // If it exists, add our new layer just before it.
+                this.map.addLayer(shaderLayer, beforeId);
+            } else {
+                // As a fallback, if the terrain layer isn't found, add the layer to the top.
+                // This prevents the map from crashing if a different style is used.
+                console.warn(`AguaceroAPI: Layer '${beforeId}' not found. Adding weather layer to the top.`);
+                this.map.addLayer(shaderLayer);
+            }
+            // --- END OF MODIFICATION ---
+
             this.layers.set(id, { id, shaderLayer, options, visible });
 
             // Set its initial data and style
@@ -286,15 +304,11 @@ export class FillLayerManager extends EventEmitter {
     async setState(newState) {
         Object.assign(this.state, newState);
 
-        // This part remains the same, it will now benefit from the cache.
         const grid = await this._loadGridData(this.state);
         
         if (grid && grid.data) {
             const fullOptions = { ...this.baseLayerOptions, ...this.state };
-            
-            // Call our new, improved rendering function
             this._updateOrCreateLayer(this.layerId, fullOptions, grid.data, grid.encoding);
-
         } else {
             this.removeLayer(this.layerId);
         }
@@ -305,14 +319,23 @@ export class FillLayerManager extends EventEmitter {
     /**
      * Initializes the manager by fetching the latest model run and rendering the first frame.
      */
-    async initialize() {
+    async initialize(options = {}) {
         const modelStatus = await this.fetchModelStatus();
         const latestRun = findLatestModelRun(modelStatus, this.state.model);
+        
         if (latestRun) {
             await this.setState({ ...latestRun, forecastHour: 0 });
         } else {
             console.error(`Could not initialize. No runs found for model "${this.state.model}".`);
-            this.emit('state:change', this.state); // Emit to render empty UI state
+            this.emit('state:change', this.state);
+        }
+        
+        const startRefresh = options.autoRefresh ?? this.autoRefreshEnabled;
+
+        if (startRefresh) {
+            // --- MODIFICATION: Changed parameter name in docs and logic ---
+            const interval = options.refreshInterval ?? this.autoRefreshIntervalSeconds;
+            this.startAutoRefresh(interval);
         }
     }
 

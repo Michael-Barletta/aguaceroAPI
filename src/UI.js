@@ -1,5 +1,5 @@
 // aguacero-api/src/UI.js
-
+import { THEME_CONFIGS } from './map-styles.js';
 export class RunSelectorPanel {
     /**
      * Creates an instance of RunSelectorPanel.
@@ -209,6 +209,102 @@ export class ForecastSliderPanel {
         });
         
         this.manager.on('state:change', () => this._update());
+
+        targetElement.appendChild(this.element);
+        return this;
+    }
+}
+export class ThemeControlPanel {
+    constructor(manager) {
+        this.manager = manager;
+        this.element = null;
+    }
+
+    addTo(target) {
+        const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
+        this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-theme-control';
+        this.element.innerHTML = `
+            <div class="aguacero-panel-label">Map Theme</div>
+            <div class="aguacero-button-group">
+                <button data-theme="light" class="aguacero-button">Light</button>
+                <button data-theme="dark" class="aguacero-button">Dark</button>
+            </div>
+        `;
+        
+        this.buttons = this.element.querySelectorAll('button');
+        this.buttons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                this.manager.setTheme(e.target.dataset.theme);
+            });
+        });
+
+        // Listen for style changes to update the active button
+        this.manager.on('style:applied', ({ themeName }) => {
+            this.buttons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === themeName);
+            });
+        });
+
+        targetElement.appendChild(this.element);
+        return this;
+    }
+}
+
+/**
+ * A UI panel that provides checkboxes to toggle the visibility of map label groups.
+ */
+export class LabelControlPanel {
+    constructor(manager, options = {}) {
+        this.manager = manager;
+        // The developer provides the list of labels they want to be controllable
+        this.labels = options.labels || [];
+        this.element = null;
+    }
+
+    addTo(target) {
+        const targetElement = (typeof target === 'string') ? document.querySelector(target) : target;
+        this.element = document.createElement('div');
+        this.element.className = 'aguacero-panel aguacero-label-control';
+        this.element.innerHTML = `<div class="aguacero-panel-label">Labels</div>`;
+
+        this.labels.forEach(labelInfo => {
+            const row = document.createElement('div');
+            row.className = 'aguacero-toggle-row';
+            
+            const checkboxId = `label-toggle-${labelInfo.key.replace('.', '-')}`;
+            
+            row.innerHTML = `
+                <label for="${checkboxId}">${labelInfo.label}</label>
+                <input type="checkbox" id="${checkboxId}" data-key="${labelInfo.key}">
+            `;
+            
+            const checkbox = row.querySelector('input');
+            checkbox.addEventListener('change', (e) => {
+                this.manager.setLabelGroupVisibility(e.target.dataset.key, e.target.checked);
+            });
+
+            this.element.appendChild(row);
+        });
+
+        // Listen for style changes to update checkbox states
+        this.manager.on('style:applied', ({ styles }) => {
+            this.element.querySelectorAll('input[type="checkbox"]').forEach(input => {
+                const [category, subKey] = input.dataset.key.split('.');
+                const isVisible = styles.labels?.[category]?.[subKey]?.visible;
+                if (isVisible !== undefined) {
+                    input.checked = isVisible;
+                }
+            });
+        });
+
+        this.buttons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const theme = e.target.dataset.theme;
+                console.log(`[ThemeControlPanel] Button clicked. Requesting theme: "${theme}"`); // <-- ADD THIS LOG
+                this.manager.setTheme(theme);
+            });
+        });
 
         targetElement.appendChild(this.element);
         return this;
