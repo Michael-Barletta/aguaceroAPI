@@ -364,7 +364,6 @@ export class LabelControlPanel {
         this.buttons.forEach(button => {
             button.addEventListener('click', (e) => {
                 const theme = e.target.dataset.theme;
-                console.log(`[ThemeControlPanel] Button clicked. Requesting theme: "${theme}"`); // <-- ADD THIS LOG
                 this.manager.setTheme(theme);
             });
         });
@@ -501,9 +500,6 @@ export class LegendPanel {
         if (!this.element) return;
 
         const { colormap, colormapBaseUnit } = this.manager.baseLayerOptions;
-        
-        // Add this log to see what colormap the legend is trying to render
-        console.log(`[Legend._update] Receiving data for variable "${state.variable}". The colormap it will render is:`, JSON.parse(JSON.stringify(colormap)));
 
         const variableInfo = DICTIONARIES.fld[state.variable] || {};
         const legendTitle = variableInfo.variable || 'Legend';

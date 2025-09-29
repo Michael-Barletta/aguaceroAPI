@@ -32,8 +32,8 @@ export class FillLayerManager extends EventEmitter {
         this.worker = this.createWorker();
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
-        this.gridDataCache = new Map();
         this.loadStrategy = options.loadStrategy || 'on-demand';
+        
 
         // --- START OF CORRECTED LOGIC ---
 
@@ -166,14 +166,8 @@ export class FillLayerManager extends EventEmitter {
      */
     async setVariable(newVariable) {
         if (newVariable === this.state.variable) return;
-
-        // Add this log to check the state of the 'customColormap' flag
-        console.log(`[Manager.setVariable] Called for variable: "${newVariable}". Custom colormap flag is:`, this.baseLayerOptions.customColormap);
-
         // If the user did NOT provide a custom colormap on initialization...
         if (!this.baseLayerOptions.customColormap) {
-            // This is the code we EXPECT to run
-            console.log('[Manager.setVariable] Proceeding to look up default colormap.');
             
             const cmapKey = DICTIONARIES.variable_cmap[newVariable] || newVariable;
             const defaultColormapSet = DEFAULT_COLORMAPS[cmapKey];
@@ -183,8 +177,6 @@ export class FillLayerManager extends EventEmitter {
                 this.baseLayerOptions.colormap = defaultColormapSet.units[baseUnit].colormap;
                 this.baseLayerOptions.colormapBaseUnit = baseUnit;
                 
-                // Add this log to confirm the new colormap was found and set
-                console.log('[Manager.setVariable] SUCCESSFULLY updated baseLayerOptions. New colormap:', this.baseLayerOptions.colormap);
             } else {
                 console.warn(`[Manager] No default colormap found for variable "${newVariable}".`);
             }
@@ -197,9 +189,6 @@ export class FillLayerManager extends EventEmitter {
     async setState(newState) {
         const modelChanged = newState.model && newState.model !== this.state.model;
         const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
-        if (modelChanged || runChanged) {
-            this.clearCache();
-        }
 
         Object.assign(this.state, newState);
 
@@ -242,25 +231,136 @@ export class FillLayerManager extends EventEmitter {
 
     // ... (All other methods like initialize, loadGridData, createWorker, etc., are unchanged) ...
     createWorker() {
-        const workerCode = ` import { decompress } from 'https://cdn.skypack.dev/fzstd@0.1.1'; self.onmessage = async (e) => { const { compressedData, encoding } = e.data; try { const decompressedDeltas = decompress(compressedData); const expectedLength = encoding.length; const reconstructedData = new Int8Array(expectedLength); if (decompressedDeltas.length > 0 && expectedLength > 0) { reconstructedData[0] = decompressedDeltas[0] > 127 ? decompressedDeltas[0] - 256 : decompressedDeltas[0]; for (let i = 1; i < expectedLength; i++) { const delta = decompressedDeltas[i] > 127 ? decompressedDeltas[i] - 256 : decompressedDeltas[i]; reconstructedData[i] = reconstructedData[i - 1] + delta; } } const finalData = new Uint8Array(reconstructedData.buffer); self.postMessage({ success: true, decompressedData: finalData }, [finalData.buffer]); } catch (error) { console.error('[WORKER] Data processing failed!', error); self.postMessage({ success: false, error: error.message }); } }; `; const blob = new Blob([workerCode], { type: 'application/javascript' }); return new Worker(URL.createObjectURL(blob), { type: 'module' });
+        const workerCode = `
+            import { decompress } from 'https://cdn.skypack.dev/fzstd@0.1.1';
+
+            self.onmessage = async (e) => {
+                const { compressedData, encoding } = e.data;
+                try {
+                    const decompressedDeltas = decompress(compressedData);
+                    const expectedLength = encoding.length;
+                    const reconstructedData = new Int8Array(expectedLength);
+
+                    if (decompressedDeltas.length > 0 && expectedLength > 0) {
+                        // The first value is absolute
+                        reconstructedData[0] = decompressedDeltas[0] > 127 
+                            ? decompressedDeltas[0] - 256 
+                            : decompressedDeltas[0];
+
+                        // Subsequent values are deltas from the previous value
+                        for (let i = 1; i < expectedLength; i++) {
+                            const delta = decompressedDeltas[i] > 127 
+                                ? decompressedDeltas[i] - 256 
+                                : decompressedDeltas[i];
+                            reconstructedData[i] = reconstructedData[i - 1] + delta;
+                        }
+                    }
+
+                    const finalData = new Uint8Array(reconstructedData.buffer);
+                    self.postMessage({ success: true, decompressedData: finalData }, [finalData.buffer]);
+
+                } catch (error) {
+                    self.postMessage({ success: false, error: error.message });
+                }
+            };
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        return new Worker(URL.createObjectURL(blob), { type: 'module' });
     }
+
+    /**
+     * Preloads all forecast hour data for the currently selected model run.
+     * This is used by the 'preload' load strategy.
+     * @private
+     */
     async _preloadCurrentRun() {
-        const { model, date, run } = this.state; const forecastHours = this.modelStatus?.[model]?.[date]?.[run]; if (!forecastHours || forecastHours.length === 0) return; console.log(`[Preload] Starting preload of ${forecastHours.length} forecast hours for ${model} ${date}/${run}Z...`); const preloadPromises = forecastHours.map(forecastHour => { const tempState = { ...this.state, forecastHour }; return this._loadGridData(tempState); }); await Promise.all(preloadPromises); console.log("[Preload] Preloading complete.");
+        const { model, date, run } = this.state;
+        const forecastHours = this.modelStatus?.[model]?.[date]?.[run];
+
+        if (!forecastHours || forecastHours.length === 0) {
+            return;
+        }
+
+        const preloadPromises = forecastHours.map(forecastHour => {
+            const tempState = { ...this.state, forecastHour };
+            return this._loadGridData(tempState);
+        });
+
+        await Promise.all(preloadPromises);
     }
+
+    /**
+     * Fetches the model status JSON file from the server.
+     * @param {boolean} [force=false] - If true, fetches new data even if it's already loaded.
+     * @returns {Promise<object|null>} The model status data, or null on failure.
+     */
     async fetchModelStatus(force = false) {
-        if (!this.modelStatus || force) { if (force) console.log("Forcing model status refresh..."); try { const response = await fetch(this.statusUrl); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`); this.modelStatus = (await response.json()).models; } catch (error) { console.error("Could not load model status:", error); this.modelStatus = null; } } return this.modelStatus;
+        if (!this.modelStatus || force) {
+            try {
+                const response = await fetch(this.statusUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const statusData = await response.json();
+                this.modelStatus = statusData.models;
+            } catch (error) {
+                this.modelStatus = null;
+            }
+        }
+        return this.modelStatus;
     }
+
+    /**
+     * Starts a timer to automatically poll for the latest model status.
+     * @param {number} [intervalSeconds] - The refresh interval in seconds.
+     */
     startAutoRefresh(intervalSeconds) {
-        const interval = intervalSeconds ?? this.autoRefreshIntervalSeconds ?? 60; this.stopAutoRefresh(); console.log(`[FillLayerManager] Starting auto-refresh every ${interval} second(s).`); this.autoRefreshIntervalId = setInterval(async () => { console.log('[FillLayerManager] Auto-refresh triggered: fetching latest model status.'); await this.fetchModelStatus(true); this.emit('state:change', this.state); }, interval * 1000);
+        const interval = intervalSeconds ?? this.autoRefreshIntervalSeconds ?? 60;
+        this.stopAutoRefresh(); // Ensure no multiple intervals are running
+
+        this.autoRefreshIntervalId = setInterval(async () => {
+            await this.fetchModelStatus(true); // Force a refresh
+            this.emit('state:change', this.state);
+        }, interval * 1000);
     }
+
+    /**
+     * Stops the automatic polling for model status updates.
+     */
     stopAutoRefresh() {
-        if (this.autoRefreshIntervalId) { clearInterval(this.autoRefreshIntervalId); this.autoRefreshIntervalId = null; console.log('[FillLayerManager] Auto-refresh stopped.'); }
-    }
-    clearCache() {
-        this.gridDataCache.clear(); console.log('[Cache] Grid data cache cleared.');
+        if (this.autoRefreshIntervalId) {
+            clearInterval(this.autoRefreshIntervalId);
+            this.autoRefreshIntervalId = null;
+        }
     }
     async _loadGridData(state) {
-        const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state }; const cacheKey = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`; if (this.gridDataCache.has(cacheKey)) { return this.gridDataCache.get(cacheKey); } const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`; try { const response = await fetch(dataUrl); if (!response.ok) throw new Error(`HTTP ${response.status}`); const { data: b64Data, encoding } = await response.json(); const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0)); return new Promise((resolve) => { const handleWorkerMessage = (e) => { this.worker.removeEventListener('message', handleWorkerMessage); if (e.data.success) { const result = { data: e.data.decompressedData, encoding: encoding }; this.gridDataCache.set(cacheKey, result); resolve(result); } else { console.error("Worker failed:", e.data.error); resolve(null); } }; this.worker.addEventListener('message', handleWorkerMessage); this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]); }); } catch (error) { console.warn(`Failed to fetch data for ${cacheKey}:`, error.message); return null; }
+        const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
+        const dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`;
+
+        const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
+        try {
+            const response = await fetch(dataUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const { data: b64Data, encoding } = await response.json();
+            const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+            return new Promise((resolve) => {
+                const handleWorkerMessage = (e) => {
+                    this.worker.removeEventListener('message', handleWorkerMessage);
+                    if (e.data.success) {
+                        const result = { data: e.data.decompressedData, encoding: encoding };
+                        resolve(result);
+                    } else {
+                        console.error("Worker failed:", e.data.error);
+                        resolve(null);
+                    }
+                };
+                this.worker.addEventListener('message', handleWorkerMessage);
+                this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]);
+            });
+        } catch (error) {
+            console.warn(`Failed to fetch data for ${dataUrlIdentifier}:`, error.message);
+            return null;
+        }
     }
     async setUnits(newUnits) {
         if (newUnits === this.state.units || !['metric', 'imperial'].includes(newUnits)) { return; } await this.setState({ units: newUnits });
