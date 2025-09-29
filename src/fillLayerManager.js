@@ -43,9 +43,7 @@ export class FillLayerManager extends EventEmitter {
         this.worker = this.createWorker();
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
-        
-        // Caching and Loading Strategy
-        this.cache = new Map();
+        this.gridDataCache = new Map();
         this.loadStrategy = options.loadStrategy || 'on-demand';
         if (!['on-demand', 'preload'].includes(this.loadStrategy)) {
             throw new Error(`Invalid loadStrategy: "${this.loadStrategy}". Must be 'on-demand' or 'preload'.`);
@@ -97,6 +95,28 @@ export class FillLayerManager extends EventEmitter {
         return new Worker(URL.createObjectURL(blob), { type: 'module' });
     }
 
+    async _preloadCurrentRun() {
+        const { model, date, run } = this.state;
+        const forecastHours = this.modelStatus?.[model]?.[date]?.[run];
+
+        if (!forecastHours || forecastHours.length === 0) {
+            return;
+        }
+
+        console.log(`Preloading ${forecastHours.length} forecast hours for ${model} ${date}/${run}Z...`);
+
+        const preloadPromises = forecastHours.map(forecastHour => {
+            // Create a temporary state for each forecast hour to pass to _loadGridData
+            const tempState = { ...this.state, forecastHour };
+            return this._loadGridData(tempState);
+        });
+
+        // Wait for all data to be fetched and decompressed in parallel
+        await Promise.all(preloadPromises);
+
+        console.log("Preloading complete.");
+    }
+
     /**
      * Fetches and caches the model status data.
      * @param {boolean} [force=false] - If true, bypasses the cache and fetches fresh data.
@@ -138,13 +158,8 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-    /**
-     * Generates a unique cache key for a given set of parameters.
-     * @private
-     */
-    _getCacheKey(state) {
-        const { model, date, run, forecastHour, variable } = { ...this.baseLayerOptions, ...state };
-        return `${model}-${date}-${run}-${forecastHour}-${variable}`;
+    clearCache() {
+        this.gridDataCache.clear();
     }
 
     /**
@@ -153,19 +168,23 @@ export class FillLayerManager extends EventEmitter {
      * @returns {Promise<Uint8Array|null>} The decompressed grid data.
      */
     async _loadGridData(state) {
-        const cacheKey = this._getCacheKey(state);
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey); // Cache now returns { data, encoding }
+        const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
+
+        // 1. Create a unique key for the requested grid data
+        const cacheKey = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`;
+
+        // 2. Check if the data is already in the cache
+        if (this.gridDataCache.has(cacheKey)) {
+            return this.gridDataCache.get(cacheKey);
         }
 
-        const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
+        // 3. If not in cache, fetch from the network (existing logic)
         const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
 
         try {
             const response = await fetch(dataUrl);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             
-            // Capture the encoding provided by the API for this specific grid
             const { data: b64Data, encoding } = await response.json();
             const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
 
@@ -173,12 +192,12 @@ export class FillLayerManager extends EventEmitter {
                 const handleWorkerMessage = (e) => {
                     this.worker.removeEventListener('message', handleWorkerMessage);
                     if (e.data.success) {
-                        // Create a result object that includes the network encoding
                         const result = {
                             data: e.data.decompressedData,
                             encoding: encoding 
                         };
-                        this.cache.set(cacheKey, result); // Cache the complete result
+                        // 4. Store the new data in the cache before resolving
+                        this.gridDataCache.set(cacheKey, result);
                         resolve(result);
                     } else {
                         console.error("Worker failed:", e.data.error);
@@ -186,11 +205,9 @@ export class FillLayerManager extends EventEmitter {
                     }
                 };
                 this.worker.addEventListener('message', handleWorkerMessage);
-                // Pass the encoding to the worker (it doesn't use it, but this is good practice)
                 this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]);
             });
         } catch (error) {
-            console.error(`Failed to fetch data for ${cacheKey}:`, error);
             return null;
         }
     }
@@ -221,33 +238,63 @@ export class FillLayerManager extends EventEmitter {
         shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
         this.map.triggerRepaint();
     }
+
+    _updateOrCreateLayer(id, options, decompressedData, encoding) {
+        const { model, colormap, opacity = 1, visible = true } = options;
+        const gridConfig = COORDINATE_CONFIGS[model];
+        if (!gridConfig) {
+            console.error(`No grid configuration found for model: ${model}`);
+            return;
+        }
+        const grid = gridConfig.grid_params;
+        const dataRange = [colormap[0], colormap[colormap.length - 2]];
+
+        // --- REFACTORED LOGIC ---
+
+        // Check if the layer already exists
+        if (this.layers.has(id)) {
+            // --- UPDATE PATH ---
+            // The layer exists, so we just update its data.
+            const layerInfo = this.layers.get(id);
+            const shaderLayer = layerInfo.shaderLayer;
+
+            // Update the data texture and style properties
+            shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
+            shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
+            
+        } else {
+            // --- CREATE PATH ---
+            // The layer does not exist, so we create it.
+            const shaderLayer = new GridRenderLayer(id);
+            this.map.addLayer(shaderLayer);
+            this.layers.set(id, { id, shaderLayer, options, visible });
+
+            // Set its initial data and style
+            shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
+            shaderLayer.updateColormapTexture(colormap);
+            shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
+        }
+
+        // In both cases, trigger a repaint to show the changes.
+        this.map.triggerRepaint();
+    }
     
     /**
      * Updates the manager's state, triggers data loading and rendering.
      * @param {object} newState - The new state properties to apply.
      */
     async setState(newState) {
-        const oldState = { ...this.state };
         Object.assign(this.state, newState);
 
-        const runChanged = oldState.date !== this.state.date || oldState.run !== this.state.run;
-
-        if (runChanged && this.loadStrategy === 'preload') {
-            console.log(`Preloading all forecast hours for ${this.state.date}/${this.state.run}Z...`);
-            const forecastHours = this.modelStatus?.[this.state.model]?.[this.state.date]?.[this.state.run] || [];
-            
-            Promise.all(forecastHours.map(hour => {
-                const stateForHour = { ...this.state, forecastHour: hour };
-                return this._loadGridData(stateForHour);
-            }));
-        }
-
+        // This part remains the same, it will now benefit from the cache.
         const grid = await this._loadGridData(this.state);
         
         if (grid && grid.data) {
             const fullOptions = { ...this.baseLayerOptions, ...this.state };
-            // Pass both the data and the encoding to the renderer
-            this._renderLayer(this.layerId, fullOptions, grid.data, grid.encoding);
+            
+            // Call our new, improved rendering function
+            this._updateOrCreateLayer(this.layerId, fullOptions, grid.data, grid.encoding);
+
         } else {
             this.removeLayer(this.layerId);
         }

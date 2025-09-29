@@ -119,6 +119,10 @@ export class ForecastSliderPanel {
         this.sliderElement = null;
         this.displayElement = null;
 
+        // --- NEW PROPERTIES FOR OPTIMIZED RENDERING ---
+        this.pendingUpdate = false;      // A flag to prevent scheduling multiple updates per frame.
+        this.latestForecastHour = null;  // The most recent forecast hour selected by the user.
+
         this.options = {
             label: options.label || 'Forecast Hour'
         };
@@ -147,6 +151,22 @@ export class ForecastSliderPanel {
     }
 
     /**
+     * The function that performs the expensive state update.
+     * It is called by requestAnimationFrame to run only once per frame.
+     * @private
+     */
+    _performUpdate() {
+        // If there's no update to perform, exit.
+        if (!this.pendingUpdate) return;
+
+        // Reset the flag so future 'input' events can schedule a new update.
+        this.pendingUpdate = false;
+
+        // Call the manager with the last known forecast hour value.
+        this.manager.setState({ forecastHour: this.latestForecastHour });
+    }
+
+    /**
      * Renders the panel and appends it to a target DOM element.
      * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
      * @returns {this} The instance for chaining.
@@ -167,12 +187,25 @@ export class ForecastSliderPanel {
         this.sliderElement = this.element.querySelector('input');
         this.displayElement = this.element.querySelector('span');
 
+        // --- REVISED EVENT LISTENER ---
         this.sliderElement.addEventListener('input', (e) => {
             const { model, date, run } = this.manager.state;
             const forecastHours = this.manager.modelStatus[model][date][run];
+            if (!forecastHours) return;
+
             const newForecastHour = forecastHours[parseInt(e.target.value, 10)];
+
+            // 1. Update the UI text immediately. This is very cheap.
             this.displayElement.textContent = newForecastHour;
-            this.manager.setState({ forecastHour: newForecastHour });
+            
+            // 2. Store the latest value.
+            this.latestForecastHour = newForecastHour;
+
+            // 3. If an update is not already pending for the next frame, schedule one.
+            if (!this.pendingUpdate) {
+                this.pendingUpdate = true;
+                requestAnimationFrame(() => this._performUpdate());
+            }
         });
         
         this.manager.on('state:change', () => this._update());
