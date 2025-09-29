@@ -58,7 +58,7 @@ export class FillLayerManager extends EventEmitter {
             run: null,
             forecastHour: 0,
             visible: true,
-            opacity: 0.7,
+            opacity: options.layerOptions?.opacity ?? 1,
         };
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
@@ -101,22 +101,21 @@ export class FillLayerManager extends EventEmitter {
         const { model, date, run } = this.state;
         const forecastHours = this.modelStatus?.[model]?.[date]?.[run];
 
-        if (!forecastHours || forecastHours.length === 0) {
-            return;
-        }
+        if (!forecastHours || forecastHours.length === 0) return;
 
-        console.log(`Preloading ${forecastHours.length} forecast hours for ${model} ${date}/${run}Z...`);
+        console.log(`[Preload] Starting preload of ${forecastHours.length} forecast hours for ${model} ${date}/${run}Z...`);
 
+        // Create an array of promises for each forecast hour's data load
         const preloadPromises = forecastHours.map(forecastHour => {
-            // Create a temporary state for each forecast hour to pass to _loadGridData
             const tempState = { ...this.state, forecastHour };
+            // _loadGridData will handle caching; we just need to call it for each hour.
             return this._loadGridData(tempState);
         });
 
-        // Wait for all data to be fetched and decompressed in parallel
+        // Wait for all fetches to complete
         await Promise.all(preloadPromises);
 
-        console.log("Preloading complete.");
+        console.log("[Preload] Preloading complete.");
     }
 
     /**
@@ -163,27 +162,34 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
+    /**
+     * ========================================================================
+     *                            THE FIRST FIX
+     * ========================================================================
+     * Clears the grid data cache. This should only be called when the model run changes.
+     */
     clearCache() {
         this.gridDataCache.clear();
+        console.log('[Cache] Grid data cache cleared.');
     }
 
     /**
-     * Loads grid data from the cache or fetches it from the network.
+     * Loads grid data, now with added logging to see cache hits and misses.
      * @private
-     * @returns {Promise<Uint8Array|null>} The decompressed grid data.
      */
     async _loadGridData(state) {
         const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
-
-        // 1. Create a unique key for the requested grid data
         const cacheKey = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`;
 
-        // 2. Check if the data is already in the cache
+        // Log every check
+        console.log(`[Cache] Requesting data for key: ${cacheKey}`);
+
         if (this.gridDataCache.has(cacheKey)) {
+            console.log(`[Cache] HIT for key: ${cacheKey}`);
             return this.gridDataCache.get(cacheKey);
         }
 
-        // 3. If not in cache, fetch from the network (existing logic)
+        console.log(`[Cache] MISS for key: ${cacheKey}. Fetching from network...`);
         const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
 
         try {
@@ -197,11 +203,9 @@ export class FillLayerManager extends EventEmitter {
                 const handleWorkerMessage = (e) => {
                     this.worker.removeEventListener('message', handleWorkerMessage);
                     if (e.data.success) {
-                        const result = {
-                            data: e.data.decompressedData,
-                            encoding: encoding 
-                        };
-                        // 4. Store the new data in the cache before resolving
+                        const result = { data: e.data.decompressedData, encoding: encoding };
+                        // Store the new data in the cache before resolving
+                        console.log(`[Cache] STORING data for key: ${cacheKey}`);
                         this.gridDataCache.set(cacheKey, result);
                         resolve(result);
                     } else {
@@ -213,35 +217,10 @@ export class FillLayerManager extends EventEmitter {
                 this.worker.postMessage({ compressedData, encoding }, [compressedData.buffer]);
             });
         } catch (error) {
+            // Don't cache failures
+            console.warn(`Failed to fetch data for ${cacheKey}:`, error.message);
             return null;
         }
-    }
-
-    /**
-     * Renders a grid layer on the map using the provided data.
-     * @private
-     */
-    _renderLayer(id, options, decompressedData, encoding) {
-        this.removeLayer(id);
-
-        const { model, colormap, opacity = 1, visible = true } = options;
-        const gridConfig = COORDINATE_CONFIGS[model];
-        if (!gridConfig) {
-            console.error(`No grid configuration found for model: ${model}`);
-            return;
-        }
-        const grid = gridConfig.grid_params;
-        
-        const shaderLayer = new GridRenderLayer(id);
-        this.map.addLayer(shaderLayer);
-        this.layers.set(id, { id, shaderLayer, options, visible });
-
-        // Use the encoding that was passed in, which came from the network
-        shaderLayer.updateDataTexture(decompressedData, encoding, grid.nx, grid.ny);
-        shaderLayer.updateColormapTexture(colormap);
-        const dataRange = [colormap[0], colormap[colormap.length - 2]];
-        shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
-        this.map.triggerRepaint();
     }
 
     _updateOrCreateLayer(id, options, decompressedData, encoding) {
@@ -302,8 +281,17 @@ export class FillLayerManager extends EventEmitter {
      * @param {object} newState - The new state properties to apply.
      */
     async setState(newState) {
+        // Determine if the fundamental model run is changing
+        const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
+
+        if (runChanged) {
+            console.log('[State] Model run changed. Clearing cache.');
+            this.clearCache();
+        }
+
         Object.assign(this.state, newState);
 
+        // This part remains the same, but it will now benefit from the corrected cache logic.
         const grid = await this._loadGridData(this.state);
         
         if (grid && grid.data) {
@@ -314,6 +302,13 @@ export class FillLayerManager extends EventEmitter {
         }
         
         this.emit('state:change', this.state);
+        
+        // If the run changed and we are in preload mode, trigger a new preload in the background.
+        if (runChanged && this.loadStrategy === 'preload') {
+            // We use a timeout of 0 to allow the current execution stack (including UI updates)
+            // to finish before starting the heavy lifting of preloading.
+            setTimeout(() => this._preloadCurrentRun(), 0);
+        }
     }
     
     /**
@@ -324,16 +319,15 @@ export class FillLayerManager extends EventEmitter {
         const latestRun = findLatestModelRun(modelStatus, this.state.model);
         
         if (latestRun) {
+            // setState will now correctly handle the initial preload trigger by itself.
             await this.setState({ ...latestRun, forecastHour: 0 });
         } else {
             console.error(`Could not initialize. No runs found for model "${this.state.model}".`);
             this.emit('state:change', this.state);
         }
-        
-        const startRefresh = options.autoRefresh ?? this.autoRefreshEnabled;
 
+        const startRefresh = options.autoRefresh ?? this.autoRefreshEnabled;
         if (startRefresh) {
-            // --- MODIFICATION: Changed parameter name in docs and logic ---
             const interval = options.refreshInterval ?? this.autoRefreshIntervalSeconds;
             this.startAutoRefresh(interval);
         }
