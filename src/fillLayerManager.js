@@ -53,17 +53,38 @@ export class FillLayerManager extends EventEmitter {
         this.worker.addEventListener('message', this._handleWorkerMessage.bind(this));
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
-        this.loadStrategy = options.loadStrategy || 'on-demand';
+        this.loadStrategy = options.loadStrategy || 'preload';
         this.dataCache = new Map();
         this.isPlaying = false;
         this.playIntervalId = null;
         this.playbackSpeed = options.playbackSpeed || 500;
         this.customColormaps = options.customColormaps || {};
         const userLayerOptions = options.layerOptions || {};
-        const initialVariable = userLayerOptions.variable || '2t_2';
-        const { colormap, baseUnit } = this._getColormapForVariable(initialVariable);
-        this.baseLayerOptions = { ...userLayerOptions, variable: initialVariable, colormap, colormapBaseUnit: baseUnit };
-        this.state = { model: userLayerOptions.model || 'gfs', variable: initialVariable, date: null, run: null, forecastHour: 0, visible: true, opacity: userLayerOptions.opacity ?? 1, units: options.initialUnit || 'imperial' };
+        const initialVariable = userLayerOptions.variable || null;
+        let colormap, baseUnit;
+        if (initialVariable) {
+            const colormapData = this._getColormapForVariable(initialVariable);
+            colormap = colormapData.colormap;
+            baseUnit = colormapData.baseUnit;
+        }
+        this.baseLayerOptions = { 
+            ...userLayerOptions, 
+            variable: initialVariable, 
+            colormap, 
+            colormapBaseUnit: baseUnit 
+        };
+        
+        this.state = { 
+            model: userLayerOptions.model || 'gfs', 
+            variable: initialVariable, 
+            date: null, 
+            run: null, 
+            forecastHour: 0, 
+            visible: true, 
+            opacity: userLayerOptions.opacity ?? 1, 
+            units: options.initialUnit || 'imperial' 
+        };
+        
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
         this.autoRefreshIntervalId = null;
@@ -141,6 +162,11 @@ export class FillLayerManager extends EventEmitter {
      * @private
      */
     async _updateLayerData(state) {
+        // Don't load anything if no variable is selected
+        if (!state.variable) {
+            return;
+        }
+        
         const grid = await this._loadGridData(state);
         const layer = this.layers.get(this.layerId);
 
@@ -148,7 +174,6 @@ export class FillLayerManager extends EventEmitter {
             const { shaderLayer } = layer;
             const gridDef = this._getGridCornersAndDef(state.model).gridDef;
 
-            // 1. Update ONLY the data texture
             shaderLayer.updateDataTexture(
                 grid.data, 
                 grid.encoding, 
@@ -156,70 +181,79 @@ export class FillLayerManager extends EventEmitter {
                 gridDef.grid_params.ny
             );
             
-            // 2. Ensure opacity is correct
             shaderLayer.updateStyle({ opacity: this.state.opacity });
-            
-            // 3. Trigger a repaint
             this.map.triggerRepaint();
         }
+    }
+
+    async setOpacity(newOpacity) {
+        // Clamp opacity between 0 and 1
+        const clampedOpacity = Math.max(0, Math.min(1, newOpacity));
+        
+        if (clampedOpacity === this.state.opacity) return;
+        
+        await this.setState({ opacity: clampedOpacity });
     }
 
     async setState(newState) {
         const modelChanged = newState.model && newState.model !== this.state.model;
         const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
-        const variableChanged = newState.variable && newState.variable !== this.state.variable;
+        const variableChanged = newState.variable !== undefined && newState.variable !== this.state.variable;
         const hourChanged = newState.forecastHour !== undefined && newState.forecastHour !== this.state.forecastHour;
 
-        // *** NEW LOGIC: Determine if this is a lightweight update ***
         const isOnlyTimeChange = hourChanged && !modelChanged && !runChanged && !variableChanged;
 
-        // Update the internal state immediately
         const previousState = { ...this.state };
         Object.assign(this.state, newState);
 
-        // If the model or run changed, clear the cache as the data is no longer relevant
         if (modelChanged || runChanged || variableChanged) {
             if (this.layers.has(this.layerId)) {
-                // Immediately hide the old layer to prevent showing stale data
                 this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 });
                 this.map.triggerRepaint();
             }
             this.dataCache.clear();
         }
 
-        // --- Emit state change event for the UI (this part remains the same) ---
-        const baseColormap = this.baseLayerOptions.colormap;
-        const fromUnit = this.baseLayerOptions.colormapBaseUnit;
-        const toUnit = this._getTargetUnit(fromUnit, this.state.units);
-        const displayColormap = this._convertColormapUnits(baseColormap, fromUnit, toUnit);
+        // Handle colormap display
+        let displayColormap = [];
+        let toUnit = '';
+        
+        if (this.state.variable && this.baseLayerOptions.colormap) {
+            const baseColormap = this.baseLayerOptions.colormap;
+            const fromUnit = this.baseLayerOptions.colormapBaseUnit;
+            toUnit = this._getTargetUnit(fromUnit, this.state.units);
+            displayColormap = this._convertColormapUnits(baseColormap, fromUnit, toUnit);
+        }
+
         this.emit('state:change', {
-            /* ... all the state properties for the UI ... */
             ...this.state,
             availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
             availableRuns: this.modelStatus?.[this.state.model] || {},
             availableHours: this.modelStatus?.[this.state.model]?.[this.state.date]?.[this.state.run] || [],
+            availableVariables: this.getAvailableVariables(this.state.model),
             isPlaying: this.isPlaying,
             colormap: displayColormap,
             colormapBaseUnit: toUnit,
         });
-        // --- End of UI state emission ---
 
-        // *** HERE IS THE CRITICAL FORK IN LOGIC ***
         if (isOnlyTimeChange) {
-            // Lightweight path: Only update the texture data
             await this._updateLayerData(this.state);
         } else {
-            // Heavy path: Re-evaluate the entire layer, including geometry
             await this._loadAndRenderGrid(this.state);
         }
         
-        // Preloading logic can remain the same
-        if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload') {
+        if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload' && this.state.variable) {
             setTimeout(() => this._preloadCurrentRun(), 0);
         }
     }
 
     async _loadAndRenderGrid(state) {
+        // Don't load anything if no variable is selected
+        if (!state.variable) {
+            this.removeLayer(this.layerId);
+            return;
+        }
+        
         const grid = await this._loadGridData(state);
         if (grid && grid.data) {
             const fullOptions = { ...this.baseLayerOptions, ...state };
@@ -371,14 +405,12 @@ export class FillLayerManager extends EventEmitter {
     _updateOrCreateLayer(id, options, decompressedData, encoding) {
         const { model, colormap, opacity = 1, visible = true, units, variable } = options;
         
-        // --- START OF FIX ---
         const geometry = this._getGridCornersAndDef(model);
         if (!geometry) {
             console.error(`Could not generate geometry for model: ${model}`);
             return;
         }
         const { corners, gridDef } = geometry;
-        // --- END OF FIX ---
 
         const fromUnit = options.colormapBaseUnit;
         const variableInfo = DICTIONARIES.fld[variable] || {};
@@ -395,14 +427,12 @@ export class FillLayerManager extends EventEmitter {
             this.layers.set(id, { id, shaderLayer, options, visible });
         }
         
-        // --- START OF FIX ---
-        // Pass both corners and the grid definition to the new, more powerful updateGeometry method
         shaderLayer.updateGeometry(corners, gridDef);
-        // --- END OF FIX ---
-
         shaderLayer.updateDataTexture(decompressedData, encoding, gridDef.grid_params.nx, gridDef.grid_params.ny);
         shaderLayer.updateColormapTexture(finalColormap);
-        shaderLayer.updateStyle({ opacity: visible ? opacity : 0, dataRange });
+        
+        // Apply the current opacity from state
+        shaderLayer.updateStyle({ opacity: visible ? this.state.opacity : 0, dataRange });
         shaderLayer.setUnitConversion(dataNativeUnit, units);
 
         this.map.triggerRepaint();
