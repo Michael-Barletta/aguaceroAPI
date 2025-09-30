@@ -808,45 +808,34 @@ export class GridRenderLayer {
         }
     }
 
-     updateDataTexture(data, encoding, width, height) {
-        // Exit if the WebGL context isn't available
+     updateDataTexture(data, encoding, width, height, options = {}) {
         if (!this.gl) return;
 
-        // Store the encoding and dimensions for use in the render loop
         this.encoding = encoding;
         this.textureWidth = width;
         this.textureHeight = height;
 
-        // The raw grid data is an array of signed 8-bit integers (-128 to 127).
-        // To use it in a LUMINANCE texture, we must convert it to an unsigned
-        // 8-bit range (0 to 255) by adding 128 to each value.
         const transformedData = new Uint8Array(data.length);
         for (let i = 0; i < data.length; i++) {
             const signedValue = data[i] > 127 ? data[i] - 256 : data[i];
             transformedData[i] = signedValue + 128;
         }
 
-        // Bind the texture we want to work with
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture);
-
-        // Tell WebGL to expect 1-byte alignment for our luminance data.
-        // This is a crucial step for non-RGBA textures.
         this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
-
-        // Upload the pixel data to the GPU
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
 
-        // --- THIS IS THE FIX ---
-        // Change texture filtering from LINEAR to NEAREST. This prevents the GPU
-        // from interpolating between valid data and missing data at the edges,
-        // which was causing the colorful artifacts.
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+        // --- THE FIX ---
+        // Conditionally set the filtering mode based on the options passed.
+        // Use NEAREST for sharp, pixelated data (like MRMS) and LINEAR for smooth data (like models).
+        const filterMode = options.useNearestFilter ? this.gl.NEAREST : this.gl.LINEAR;
+        
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
 
-        // We can keep CLAMP_TO_EDGE as it's the correct wrapping mode for
-        // regional, non-repeating data.
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE); // Horizontal wrap
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE); // Vertical wrap
+        // Wrapping mode remains unchanged.
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
     }
     
     updateColormapTexture(colormap) {
