@@ -1,4 +1,6 @@
-class L {
+import { MercatorCoordinate as Q } from "mapbox-gl";
+import j from "proj4";
+class i0 {
   constructor() {
     this.callbacks = {};
   }
@@ -7,14 +9,21 @@ class L {
   }
   emit(e, t) {
     let a = this.callbacks[e];
-    a && a.forEach((n) => n(t));
+    a && a.forEach((r) => r(t));
   }
 }
-class I {
+const V = 89;
+function a0(i, e) {
+  const a = 245.305142, r = Math.PI / 180, c = 180 / Math.PI, _ = 53.91148 * r, n = i * r, o = e * r, f = Math.sin(o), p = Math.cos(o), b = Math.sin(n), g = Math.cos(n), w = Math.sin(_), m = Math.cos(_), s = m * f + w * p * g;
+  let A = Math.asin(s) * c;
+  const P = p * b, z = -w * f + m * p * g;
+  let S = Math.atan2(P, z) * c + a;
+  return S > 180 ? S -= 360 : S < -180 && (S += 360), [S, A];
+}
+class r0 {
   constructor(e) {
-    this.id = e, this.type = "custom", this.renderingMode = "2d", this.map = null, this.gl = null, this.program = null, this.opacity = 1, this.dataRange = [0, 1], this.vertexBuffer = null, this.indexBuffer = null, this.indexCount = 0, this.dataTexture = null, this.colormapTexture = null, this.encoding = null, this.textureWidth = 0, this.textureHeight = 0, this.u_conversion_type = null, this.currentConversion = {
-      type: 2
-      // Default to Imperial (Celsius -> Fahrenheit)
+    this.id = e, this.type = "custom", this.renderingMode = "2d", this.map = null, this.gl = null, this.program = null, this.opacity = 1, this.dataRange = [0, 1], this.vertexBuffer = null, this.indexBuffer = null, this.indexCount = 0, this.dataTexture = null, this.colormapTexture = null, this.encoding = null, this.textureWidth = 0, this.textureHeight = 0, this.cachedCorners = null, this.cachedGridDef = null, this.currentConversion = {
+      type: 0
     };
   }
   onAdd(e, t) {
@@ -27,7 +36,7 @@ class I {
             void main() {
                 gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
                 v_texCoord = a_texCoord;
-            }`, n = `
+            }`, r = `
             precision highp float;
             varying vec2 v_texCoord;
             uniform sampler2D u_data_texture;
@@ -40,131 +49,375 @@ class I {
             uniform vec2 u_texture_size;
             uniform int u_conversion_type;
 
-            float get_value(vec2 coord) {
-                float value_0_to_255 = texture2D(u_data_texture, coord).r * 255.0;
-                if (abs((value_0_to_255 - 128.0) - u_missing_quantized) < 0.5) {
-                    return 9999.0;
-                }
-                return value_0_to_255 - 128.0;
-            }
-
-            float convert_units(float raw_value_celsius) {
-                if (u_conversion_type == 1) return raw_value_celsius;
-                if (u_conversion_type == 2) return raw_value_celsius * 1.8 + 32.0;
-                return raw_value_celsius;
+            float convert_units(float raw_value) {
+                if (u_conversion_type == 1) return raw_value;
+                if (u_conversion_type == 2) return raw_value * 1.8 + 32.0;
+                // ... add other conversions from your full shader if needed ...
+                return raw_value;
             }
 
             void main() {
-                // Bilinear interpolation logic (unchanged)
-                vec2 tex_coord_in_texels = v_texCoord * u_texture_size;
-                vec2 pixel_floor = floor(tex_coord_in_texels - 0.5);
-                vec2 pixel_fract = fract(tex_coord_in_texels - 0.5);
-                vec2 texel_size = 1.0 / u_texture_size;
-                vec2 v00_coord = (pixel_floor + vec2(0.5, 0.5)) * texel_size;
-                vec2 v10_coord = (pixel_floor + vec2(1.5, 0.5)) * texel_size;
-                vec2 v01_coord = (pixel_floor + vec2(0.5, 1.5)) * texel_size;
-                vec2 v11_coord = (pixel_floor + vec2(1.5, 1.5)) * texel_size;
-                float v00 = get_value(v00_coord);
-                float v10 = get_value(v10_coord);
-                float v01 = get_value(v01_coord);
-                float v11 = get_value(v11_coord);
-                float total_weight = 0.0;
-                float total_value = 0.0;
-                if (v00 < 9000.0) { float w = (1.0 - pixel_fract.x) * (1.0 - pixel_fract.y); total_value += v00 * w; total_weight += w; }
-                if (v10 < 9000.0) { float w = pixel_fract.x * (1.0 - pixel_fract.y); total_value += v10 * w; total_weight += w; }
-                if (v01 < 9000.0) { float w = (1.0 - pixel_fract.x) * pixel_fract.y; total_value += v01 * w; total_weight += w; }
-                if (v11 < 9000.0) { float w = pixel_fract.x * pixel_fract.y; total_value += v11 * w; total_weight += w; }
-                if (total_weight <= 0.0) {
+                // The GPU handles bilinear interpolation and texture wrapping automatically
+                // because we set TEXTURE_MAG_FILTER to LINEAR and TEXTURE_WRAP_S to REPEAT.
+                // We simply sample the texture at the coordinate provided by the vertex shader.
+                float value_0_to_255 = texture2D(u_data_texture, v_texCoord).r * 255.0;
+                
+                // Convert from the texture's [0, 255] range back to the signed quantized value [-128, 127]
+                float quantized_value = value_0_to_255 - 128.0;
+
+                // Check for the missing data value.
+                if (abs(quantized_value - u_missing_quantized) < 0.5) {
                     discard;
                 }
-                float quantized_value = total_value / total_weight;
 
+                // De-quantize, convert units, and apply the colormap as before.
                 float raw_value = quantized_value * u_scale + u_offset;
                 float converted_value = convert_units(raw_value);
 
-                // --- THIS IS THE FIX ---
-                // Before coloring, check if the value is within the colormap's valid range.
-                // u_data_range.x is the minimum (5) and u_data_range.y is the maximum (80).
                 if (converted_value < u_data_range.x || converted_value > u_data_range.y) {
-                    discard; // This makes the pixel transparent.
+                    discard;
                 }
-                // --- END OF FIX ---
-
-                // Calculate the position on the colormap (a value from 0.0 to 1.0).
+                
                 float colormap_coord = (converted_value - u_data_range.x) / (u_data_range.y - u_data_range.x);
-
                 vec4 color = texture2D(u_colormap_texture, vec2(colormap_coord, 0.5));
-                if (color.a < 0.1) discard;
+                
+                if (color.a < 0.1) {
+                    discard;
+                }
+
                 gl_FragColor = vec4(color.rgb, color.a * u_opacity);
-            }`, r = t.createShader(t.VERTEX_SHADER);
-    t.shaderSource(r, a), t.compileShader(r);
-    const o = t.createShader(t.FRAGMENT_SHADER);
-    t.shaderSource(o, n), t.compileShader(o), t.getShaderParameter(o, t.COMPILE_STATUS) || console.error("Fragment shader failed to compile:", t.getShaderInfoLog(o)), this.program = t.createProgram(), t.attachShader(this.program, r), t.attachShader(this.program, o), t.linkProgram(this.program), t.getProgramParameter(this.program, t.LINK_STATUS) || console.error("Shader program failed to link:", t.getProgramInfoLog(this.program)), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.updateGeometry();
+            }`, c = t.createShader(t.VERTEX_SHADER);
+    t.shaderSource(c, a), t.compileShader(c);
+    const _ = t.createShader(t.FRAGMENT_SHADER);
+    t.shaderSource(_, r), t.compileShader(_), this.program = t.createProgram(), t.attachShader(this.program, c), t.attachShader(this.program, _), t.linkProgram(this.program), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.cachedCorners && this.cachedGridDef && this.updateGeometry(this.cachedCorners, this.cachedGridDef);
   }
-  // This method remains unchanged
-  updateGeometry(e = { lon_tl: -180, lat_tl: 90, lon_tr: 180, lat_tr: 90, lon_bl: -180, lat_bl: -90, lon_br: 180, lat_br: -90 }) {
-    const t = this.gl;
-    if (!t) return;
-    const a = 120, n = [], r = [], o = 89.5;
-    for (let s = 0; s <= a; s++)
-      for (let c = 0; c <= a; c++) {
-        const l = c / a, m = s / a, p = e.lon_tl + l * (e.lon_tr - e.lon_tl);
-        let _ = e.lat_tl + m * (e.lat_bl - e.lat_tl);
-        _ = Math.max(-o, Math.min(o, _));
-        const d = mapboxgl.MercatorCoordinate.fromLngLat({ lon: p, lat: _ }), u = l, h = m;
-        n.push(d.x, d.y, u, h);
-      }
-    for (let s = 0; s < a; s++)
-      for (let c = 0; c < a; c++) {
-        const l = s * (a + 1) + c, m = l + 1, p = (s + 1) * (a + 1) + c, _ = p + 1;
-        r.push(l, p, m, m, p, _);
-      }
-    t.bindBuffer(t.ARRAY_BUFFER, this.vertexBuffer), t.bufferData(t.ARRAY_BUFFER, new Float32Array(n), t.STATIC_DRAW), t.bindBuffer(t.ELEMENT_ARRAY_BUFFER, this.indexBuffer), t.bufferData(t.ELEMENT_ARRAY_BUFFER, new Uint16Array(r), t.STATIC_DRAW), this.indexCount = r.length;
-  }
-  // This method remains unchanged
-  updateDataTexture(e, t, a, n) {
-    const r = this.gl;
-    if (!r) return;
-    this.encoding = t, this.textureWidth = a, this.textureHeight = n;
-    const o = new Uint8Array(e.length);
-    for (let s = 0; s < e.length; s++) {
-      const c = e[s] > 127 ? e[s] - 256 : e[s];
-      o[s] = c + 128;
+  updateGeometry(e, t) {
+    if (this.cachedCorners = e, this.cachedGridDef = t, !this.gl || !this.vertexBuffer) return;
+    const a = this.gl, r = 120;
+    if ([
+      e.lon_tl,
+      e.lat_tl,
+      e.lon_tr,
+      e.lat_tr,
+      e.lon_bl,
+      e.lat_bl,
+      e.lon_br,
+      e.lat_br
+    ].some((n) => !isFinite(n))) {
+      console.error("[GridLayer] Invalid corner coordinates:", e);
+      return;
     }
-    r.bindTexture(r.TEXTURE_2D, this.dataTexture), r.pixelStorei(r.UNPACK_ALIGNMENT, 1), r.texImage2D(r.TEXTURE_2D, 0, r.LUMINANCE, a, n, 0, r.LUMINANCE, r.UNSIGNED_BYTE, o), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MIN_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MAG_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_S, r.CLAMP_TO_EDGE), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_T, r.CLAMP_TO_EDGE);
+    const _ = t.type;
+    if (_ === "latlon") {
+      const n = [], o = [], f = e.lat_tl < e.lat_bl, p = t.grid_params && t.grid_params.lon_first === 336.5 && Math.abs(t.grid_params.lat_first) === 29.5, b = t.grid_params && t.grid_params.lon_first === 356.06 && Math.abs(t.grid_params.lat_first) === 43.18, g = t.grid_params && t.grid_params.lon_first === 0 && Math.abs(t.grid_params.lat_first) === 90, w = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === 90, m = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === -90 && t.grid_params.lon_last === 179.85;
+      let s = e;
+      if (g ? (s = {
+        lon_tl: e.lon_tl - 180,
+        lat_tl: e.lat_tl,
+        lon_tr: e.lon_tr - 180,
+        lat_tr: e.lat_tr,
+        lon_bl: e.lon_bl - 180,
+        lat_bl: e.lat_bl,
+        lon_br: e.lon_br - 180,
+        lat_br: e.lat_br
+      }, Object.keys(s).forEach((C) => {
+        C.startsWith("lon_") && s[C] < -180 && (s[C] += 360);
+      })) : w ? s = {
+        lon_tl: e.lon_tl >= 180 ? e.lon_tl - 360 : e.lon_tl,
+        lat_tl: e.lat_tl,
+        lon_tr: e.lon_tr >= 180 ? e.lon_tr - 360 : e.lon_tr,
+        lat_tr: e.lat_tr,
+        lon_bl: e.lon_bl >= 180 ? e.lon_bl - 360 : e.lon_bl,
+        lat_bl: e.lat_bl,
+        lon_br: e.lon_br >= 180 ? e.lon_br - 360 : e.lon_br,
+        lat_br: e.lat_br
+      } : m && (s = e), Math.abs(s.lon_tr - s.lon_tl) >= 359 || m) {
+        const C = r * 3;
+        for (let h = 0; h <= r; h++)
+          for (let T = 0; T <= C; T++) {
+            const x = T / r - 1;
+            let k;
+            m ? k = 1 - h / r : k = f ? 1 - h / r : h / r;
+            let u, l;
+            u = s.lon_tl - 360, l = s.lon_tr + 360;
+            const R = l - u, F = u + T / C * R, d = h / r, y = s.lat_tl + d * (s.lat_bl - s.lat_tl);
+            if (!isFinite(F) || !isFinite(y))
+              continue;
+            const M = Q.fromLngLat({ lon: F, lat: y });
+            !isFinite(M.x) || !isFinite(M.y) || n.push(M.x, M.y, x, k);
+          }
+        const v = C + 1;
+        for (let h = 0; h < r; h++)
+          for (let T = 0; T < C; T++) {
+            const x = h * v + T, k = x + 1, u = (h + 1) * v + T, l = u + 1;
+            l < n.length / 4 && (o.push(x, u, k), o.push(k, u, l));
+          }
+      } else {
+        if ([
+          s.lon_tl,
+          s.lat_tl,
+          s.lon_tr,
+          s.lat_tr,
+          s.lon_bl,
+          s.lat_bl,
+          s.lon_br,
+          s.lat_br
+        ].some((x) => !isFinite(x))) {
+          console.error("[GridLayer] Invalid adjusted corner coordinates:", s);
+          return;
+        }
+        if ([s.lat_tl, s.lat_tr, s.lat_bl, s.lat_br].some((x) => x < -90 || x > 90)) {
+          console.error("[GridLayer] Invalid latitude values in corners:", s), console.error("[GridLayer] Original corners were:", e), console.error("[GridLayer] Grid definition:", t);
+          return;
+        }
+        const T = Math.abs(s.lon_tr - s.lon_tl) > 180;
+        for (let x = 0; x <= r; x++)
+          for (let k = 0; k <= r; k++) {
+            const u = k / r, l = x / r;
+            let R = u, F;
+            f && !b && !p ? F = 1 - l : F = l;
+            let d, y;
+            if (T) {
+              let U = s.lon_tl, E = s.lon_tr, G = s.lon_bl, H = s.lon_br;
+              for (E < U && (E += 360), H < G && (H += 360), d = (1 - l) * ((1 - u) * U + u * E) + l * ((1 - u) * G + u * H); d > 180; ) d -= 360;
+              for (; d < -180; ) d += 360;
+            } else
+              d = (1 - l) * ((1 - u) * s.lon_tl + u * s.lon_tr) + l * ((1 - u) * s.lon_bl + u * s.lon_br);
+            if (y = (1 - l) * ((1 - u) * s.lat_tl + u * s.lat_tr) + l * ((1 - u) * s.lat_bl + u * s.lat_br), y = Math.max(-V, Math.min(V, y)), !isFinite(d) || !isFinite(y)) {
+              console.error(`[GridLayer] Invalid interpolated coordinates at ${x},${k}: lon=${d}, lat=${y}`), console.error("[GridLayer] Interpolation inputs:", {
+                t_x: u,
+                t_y: l,
+                corners: s,
+                gridType: g ? "GFS" : w ? "ECMWF" : isIconModel ? "ICON" : "OTHER"
+              });
+              continue;
+            }
+            let M = d;
+            for (; M > 180; ) M -= 360;
+            for (; M < -180; ) M += 360;
+            const I = Q.fromLngLat({ lon: M, lat: y });
+            if (!isFinite(I.x) || !isFinite(I.y)) {
+              console.error(`[GridLayer] Invalid Mercator coordinates: x=${I.x}, y=${I.y}`);
+              continue;
+            }
+            n.push(I.x, I.y, R, F);
+          }
+        for (let x = 0; x < r; x++)
+          for (let k = 0; k < r; k++) {
+            const u = x * (r + 1) + k, l = u + 1, R = (x + 1) * (r + 1) + k, F = R + 1;
+            o.push(u, R, l), o.push(l, R, F);
+          }
+      }
+      const z = new Float32Array(n);
+      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, z, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
+      const S = new Uint16Array(o);
+      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexCount = o.length, this.vertexCount = n.length / 4;
+    } else if (_ === "rotated_latlon") {
+      t.proj_params;
+      const n = [], o = [], { lon_first: f, lat_first: p, dx_degrees: b, dy_degrees: g, nx: w, ny: m } = t.grid_params, s = f, A = p, P = f + (w - 1) * b, z = p + (m - 1) * g;
+      for (let v = 0; v <= r; v++)
+        for (let h = 0; h <= r; h++) {
+          const T = h / r, x = v / r, k = s + T * (P - s), u = A + x * (z - A);
+          try {
+            const [l, R] = a0(k, u);
+            if (!isFinite(l) || !isFinite(R)) {
+              console.warn(`[GridLayer] Invalid HRDPS transformed coordinates at ${v},${h}: lon=${l}, lat=${R}`);
+              continue;
+            }
+            const F = Math.max(-V, Math.min(V, R)), d = Q.fromLngLat({ lon: l, lat: F });
+            if (!isFinite(d.x) || !isFinite(d.y)) {
+              console.warn(`[GridLayer] Invalid HRDPS Mercator coordinates: x=${d.x}, y=${d.y}`);
+              continue;
+            }
+            const y = T, M = 1 - x;
+            n.push(d.x, d.y, y, M);
+          } catch (l) {
+            console.warn(`[GridLayer] HRDPS manual transformation error at ${v},${h}:`, l);
+            continue;
+          }
+        }
+      for (let v = 0; v < r; v++)
+        for (let h = 0; h < r; h++) {
+          const T = v * (r + 1) + h, x = T + 1, k = (v + 1) * (r + 1) + h, u = k + 1;
+          u < n.length / 4 && (o.push(T, k, x), o.push(x, k, u));
+        }
+      const S = new Float32Array(n);
+      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
+      const C = new Uint16Array(o);
+      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, C, a.STATIC_DRAW), this.indexCount = o.length, this.vertexCount = n.length / 4;
+    } else if (_ === "polar_stereographic") {
+      const n = t.proj_params;
+      let o = `+proj=${n.proj}`;
+      Object.keys(n).forEach((l) => {
+        l !== "proj" && (o += ` +${l}=${n[l]}`);
+      }), o += " +lat_0=90 +no_defs";
+      const f = "EPSG:4326", { nx: p, ny: b, dx: g, dy: w, x_origin: m, y_origin: s } = t.grid_params, A = m, P = m + (p - 1) * g, z = s, S = s + (b - 1) * w, C = [], v = [], h = [];
+      let T = 0, x = NaN;
+      for (let l = 0; l <= r; l++) {
+        h[l] = [];
+        for (let R = 0; R <= r; R++) {
+          const F = R / r, d = l / r, y = A + F * (P - A), M = z + d * (S - z);
+          try {
+            const [I, U] = j(o, f, [y, M]);
+            if (!isFinite(I) || !isFinite(U)) {
+              h[l][R] = null;
+              continue;
+            }
+            if (I > 0) {
+              console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${E} at [${l},${R}]`), h[l][R] = null;
+              continue;
+            }
+            let E = I;
+            if (!isNaN(x)) {
+              for (; E - x > 180; )
+                E -= 360;
+              for (; x - E > 180; )
+                E += 360;
+            }
+            x = E;
+            const G = Math.max(-V, Math.min(V, U)), H = Q.fromLngLat({ lon: E, lat: G });
+            if (!isFinite(H.x) || !isFinite(H.y)) {
+              h[l][R] = null;
+              continue;
+            }
+            const W = F, O = d;
+            h[l][R] = {
+              mercator_x: H.x,
+              mercator_y: H.y,
+              tex_u: W,
+              tex_v: O,
+              vertexIndex: T
+            }, C.push(H.x, H.y, W, O), T++;
+          } catch {
+            h[l][R] = null;
+            continue;
+          }
+        }
+      }
+      if (C.length === 0) {
+        console.error("[GridLayer] No valid vertices generated for polar stereographic model");
+        return;
+      }
+      for (let l = 0; l < r; l++)
+        for (let R = 0; R < r; R++) {
+          const F = h[l][R], d = h[l][R + 1], y = h[l + 1][R], M = h[l + 1][R + 1];
+          F && d && y && M && (v.push(
+            F.vertexIndex,
+            y.vertexIndex,
+            d.vertexIndex
+          ), v.push(
+            d.vertexIndex,
+            y.vertexIndex,
+            M.vertexIndex
+          ));
+        }
+      const k = new Float32Array(C);
+      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, k, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
+      const u = new Uint16Array(v);
+      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, u, a.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = C.length / 4;
+    } else if (_ === "lambert_conformal_conic") {
+      const n = t.proj_params;
+      let o = `+proj=${n.proj}`;
+      Object.keys(n).forEach((d) => {
+        d !== "proj" && (o += ` +${d}=${n[d]}`);
+      }), o += " +no_defs";
+      const f = "EPSG:4326", { nx: p, ny: b, dx: g, dy: w, x_origin: m, y_origin: s } = t.grid_params, A = m, P = s, z = m + (p - 1) * g, S = s + (b - 1) * w, C = [], v = [];
+      let h = 1 / 0, T = -1 / 0, x = 1 / 0, k = -1 / 0, u = 0;
+      const l = [];
+      for (let d = 0; d <= r; d++)
+        l[d] = [];
+      for (let d = 0; d <= r; d++)
+        for (let y = 0; y <= r; y++) {
+          const M = y / r, I = d / r, U = A + M * (z - A), E = P + I * (S - P);
+          try {
+            const [G, H] = j(o, f, [U, E]);
+            if (G > 0) {
+              console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${G} at [${d},${y}]`), l[d][y] = null;
+              continue;
+            }
+            h = Math.min(h, G), T = Math.max(T, G), x = Math.min(x, H), k = Math.max(k, H);
+            const W = Q.fromLngLat({ lon: G, lat: H });
+            if (!isFinite(W.x) || !isFinite(W.y)) {
+              l[d][y] = null;
+              continue;
+            }
+            const O = M, Y = I;
+            l[d][y] = {
+              mercator_x: W.x,
+              mercator_y: W.y,
+              tex_u: O,
+              tex_v: Y,
+              vertexIndex: u
+            }, C.push(W.x, W.y, O, Y), u++;
+          } catch (G) {
+            console.warn(`[GridLayer] Projection error at [${d},${y}] with coords [${U}, ${E}]:`, G), l[d][y] = null;
+            continue;
+          }
+        }
+      if (C.length === 0) {
+        console.error(`[GridLayer] No valid vertices generated for ${this.modelName}`);
+        return;
+      }
+      for (let d = 0; d < r; d++)
+        for (let y = 0; y < r; y++) {
+          const M = l[d][y], I = l[d][y + 1], U = l[d + 1][y], E = l[d + 1][y + 1];
+          M && I && U && E && (v.push(
+            M.vertexIndex,
+            U.vertexIndex,
+            I.vertexIndex
+          ), v.push(
+            I.vertexIndex,
+            U.vertexIndex,
+            E.vertexIndex
+          ));
+        }
+      T - h > 180 && console.warn(`[GridLayer] ${this.modelName} longitude span is ${(T - h).toFixed(2)}° - this might indicate projection issues`);
+      const R = new Float32Array(C);
+      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, R, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
+      const F = new Uint16Array(v);
+      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, F, a.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = C.length / 4;
+    } else {
+      console.error(`[GridLayer] Unsupported grid type: ${_}`);
+      return;
+    }
   }
-  // This method remains unchanged
+  updateDataTexture(e, t, a, r) {
+    if (!this.gl) return;
+    this.encoding = t, this.textureWidth = a, this.textureHeight = r;
+    const c = new Uint8Array(e.length);
+    for (let n = 0; n < e.length; n++) {
+      const o = e[n] > 127 ? e[n] - 256 : e[n];
+      c[n] = o + 128;
+    }
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture), this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, a, r, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, c), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+    const _ = this.isGlobal ? this.gl.REPEAT : this.gl.CLAMP_TO_EDGE;
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, _), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+  }
   updateColormapTexture(e) {
-    const t = this.gl;
-    if (!t) return;
-    const a = 256, n = new Uint8Array(a * 4), r = [];
-    for (let _ = 0; _ < e.length; _ += 2)
-      r.push({ value: e[_], color: e[_ + 1] });
+    if (!this.gl) return;
+    const t = 256, a = new Uint8Array(t * 4), r = e.reduce((o, f, p) => p % 2 === 0 ? [...o, { value: e[p], color: e[p + 1] }] : o, []);
     if (r.length === 0) return;
-    const o = r[0].value, c = r[r.length - 1].value - o, l = (_) => [parseInt(_.slice(1, 3), 16), parseInt(_.slice(3, 5), 16), parseInt(_.slice(5, 7), 16)], m = (_, d, u) => [Math.round(_[0] * (1 - u) + d[0] * u), Math.round(_[1] * (1 - u) + d[1] * u), Math.round(_[2] * (1 - u) + d[2] * u)];
-    let p = 0;
-    for (let _ = 0; _ < a; _++) {
-      const d = o + _ / (a - 1) * c;
-      for (; p < r.length - 2 && d > r[p + 1].value; )
-        p++;
-      const u = r[p], h = r[p + 1], y = (d - u.value) / (h.value - u.value), v = m(l(u.color), l(h.color), y);
-      n[_ * 4] = v[0], n[_ * 4 + 1] = v[1], n[_ * 4 + 2] = v[2], n[_ * 4 + 3] = 255;
+    const c = r[0].value, _ = r[r.length - 1].value, n = (o) => [parseInt(o.slice(1, 3), 16), parseInt(o.slice(3, 5), 16), parseInt(o.slice(5, 7), 16)];
+    for (let o = 0; o < t; o++) {
+      const f = c + o / (t - 1) * (_ - c);
+      let p = r[0], b = r[r.length - 1];
+      for (let m = 0; m < r.length - 1; m++)
+        if (f >= r[m].value && f <= r[m + 1].value) {
+          p = r[m], b = r[m + 1];
+          break;
+        }
+      const g = (f - p.value) / (b.value - p.value || 1), w = n(p.color).map((m, s) => m * (1 - g) + n(b.color)[s] * g);
+      a.set(w, o * 4), a[o * 4 + 3] = 255;
     }
-    t.bindTexture(t.TEXTURE_2D, this.colormapTexture), t.texImage2D(t.TEXTURE_2D, 0, t.RGBA, a, 1, 0, t.RGBA, t.UNSIGNED_BYTE, n), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_MIN_FILTER, t.LINEAR), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_S, t.CLAMP_TO_EDGE), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_T, t.CLAMP_TO_EDGE);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, t, 1, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, a), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
-  // This method remains unchanged
   updateStyle({ opacity: e, dataRange: t }) {
     e !== void 0 && (this.opacity = e), t !== void 0 && (this.dataRange = t);
   }
-  /**
-   * NEW METHOD: Sets the unit conversion mode for the shader.
-   * @param {string} fromUnit - The native unit of the data (e.g., 'kelvin').
-   * @param {'metric'|'imperial'} targetSystem - The target display system.
-   */
   setUnitConversion(e, t) {
     let a = 0;
-    const n = (e || "").toLowerCase();
-    n.includes("c") || n.includes("f") ? t === "metric" ? a = 1 : t === "imperial" && (a = 2) : n === "kts" && (t === "imperial" ? a = 8 : t === "metric" && (a = 15)), this.currentConversion.type = a, this.map && this.map.triggerRepaint();
+    const r = (e || "").toLowerCase();
+    (r.includes("c") || r.includes("f")) && (t === "metric" ? a = 1 : t === "imperial" && (a = 2)), this.currentConversion.type = a, this.map && this.map.triggerRepaint();
   }
   render(e, t) {
     !this.program || !this.encoding || !this.vertexBuffer || !this.indexBuffer || (e.useProgram(this.program), e.uniformMatrix4fv(this.u_matrix, !1, t), e.uniform1f(this.u_opacity, this.opacity), e.uniform2f(this.u_data_range, this.dataRange[0], this.dataRange[1]), e.uniform1f(this.u_scale, this.encoding.scale), e.uniform1f(this.u_offset, this.encoding.offset), e.uniform1f(this.u_missing_quantized, this.encoding.missing_quantized || 127), e.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight), e.uniform1i(this.u_conversion_type, this.currentConversion.type), e.activeTexture(e.TEXTURE0), e.bindTexture(e.TEXTURE_2D, this.dataTexture), e.uniform1i(this.u_data_texture, 0), e.activeTexture(e.TEXTURE1), e.bindTexture(e.TEXTURE_2D, this.colormapTexture), e.uniform1i(this.u_colormap_texture, 1), e.bindBuffer(e.ARRAY_BUFFER, this.vertexBuffer), e.enableVertexAttribArray(this.a_position), e.vertexAttribPointer(this.a_position, 2, e.FLOAT, !1, 16, 0), e.enableVertexAttribArray(this.a_texCoord), e.vertexAttribPointer(this.a_texCoord, 2, e.FLOAT, !1, 16, 8), e.bindBuffer(e.ELEMENT_ARRAY_BUFFER, this.indexBuffer), e.enable(e.BLEND), e.blendFunc(e.SRC_ALPHA, e.ONE_MINUS_SRC_ALPHA), e.drawElements(e.TRIANGLES, this.indexCount, e.UNSIGNED_SHORT, 0));
@@ -173,7 +426,7 @@ class I {
     this.gl && (this.program && this.gl.deleteProgram(this.program), this.vertexBuffer && this.gl.deleteBuffer(this.vertexBuffer), this.indexBuffer && this.gl.deleteBuffer(this.indexBuffer), this.dataTexture && this.gl.deleteTexture(this.dataTexture), this.colormapTexture && this.gl.deleteTexture(this.colormapTexture));
   }
 }
-const A = {
+const n0 = {
   arome1: {
     type: "latlon",
     proj_params: {
@@ -546,7 +799,7 @@ const A = {
       lat_last: 20.005001
     }
   }
-}, F = {
+}, o0 = {
   kelvin_to_celsius: (i) => i - 273.15,
   kelvin_to_fahrenheit: (i) => (i - 273.15) * 9 / 5 + 32,
   kelvin_to_c: (i) => i - 273.15,
@@ -601,7 +854,7 @@ const A = {
   mm_hr_to_cm_hr: (i) => i / 10,
   cm_hr_to_mm_hr: (i) => i * 10
 };
-function H(i, e) {
+function s0(i, e) {
   const t = {
     "°c": "c",
     "°f": "f",
@@ -631,14 +884,14 @@ function H(i, e) {
     "cm/hr": "cmhr",
     in: "in",
     inches: "in"
-  }, a = (s) => {
-    if (!s) return "";
-    const c = s.toLowerCase().trim();
-    return t[c] || c;
-  }, n = a(i), r = a(e), o = `${n}_to_${r}`;
-  return F[o] || null;
+  }, a = (n) => {
+    if (!n) return "";
+    const o = n.toLowerCase().trim();
+    return t[o] || o;
+  }, r = a(i), c = a(e), _ = `${r}_to_${c}`;
+  return o0[_] || null;
 }
-const E = {
+const c0 = {
   mrms: {
     vars: [
       "MergedReflectivityQCComposite_00.50",
@@ -1301,7 +1554,7 @@ const E = {
     skewt: !0,
     order: 2
   }
-}, R = {
+}, q = {
   fld: {
     "": {
       category: "",
@@ -4808,7 +5061,7 @@ const E = {
     t_925iso0: "t_iso",
     "2t_2iso0": "t_iso"
   }
-}, U = {
+}, _0 = {
   "MergedZdr_04.00": {
     type: "fill",
     gridded: !1,
@@ -12852,67 +13105,48 @@ const E = {
     }
   }
 };
-function C(i, e) {
-  const t = i?.[e];
+function $(i, e) {
+  const a = 245.305142, r = Math.PI / 180, c = 180 / Math.PI, _ = 53.91148 * r, n = i * r, o = e * r, f = Math.sin(o), p = Math.cos(o), b = Math.sin(n), g = Math.cos(n), w = Math.sin(_), m = Math.cos(_), s = m * f + w * p * g;
+  let A = Math.asin(s) * c;
+  const P = p * b, z = -w * f + m * p * g;
+  let S = Math.atan2(P, z) * c + a;
+  return S > 180 ? S -= 360 : S < -180 && (S += 360), [S, A];
+}
+function J(i, e) {
+  const t = i == null ? void 0 : i[e];
   if (!t) return null;
-  const a = Object.keys(t).sort((n, r) => r.localeCompare(n));
-  for (const n of a) {
-    const r = t[n];
-    if (!r) continue;
-    const o = Object.keys(r).sort((s, c) => c.localeCompare(s));
-    if (o.length > 0) return { date: n, run: o[0] };
+  const a = Object.keys(t).sort((r, c) => c.localeCompare(r));
+  for (const r of a) {
+    const c = t[r];
+    if (!c) continue;
+    const _ = Object.keys(c).sort((n, o) => o.localeCompare(n));
+    if (_.length > 0) return { date: r, run: _[0] };
   }
   return null;
 }
-class B extends L {
+class h0 extends i0 {
   constructor(e, t = {}) {
     if (super(), !e) throw new Error("A Mapbox GL map instance is required.");
     this.map = e, this.layers = /* @__PURE__ */ new Map(), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`, this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.dataCache = /* @__PURE__ */ new Map(), this.isPlaying = !1, this.playIntervalId = null, this.playbackSpeed = t.playbackSpeed || 500, this.customColormaps = t.customColormaps || {};
-    const a = t.layerOptions || {}, n = a.variable || "2t_2", { colormap: r, baseUnit: o } = this._getColormapForVariable(n);
-    this.baseLayerOptions = {
-      ...a,
-      variable: n,
-      colormap: r,
-      colormapBaseUnit: o
-    }, this.state = {
-      model: a.model || "gfs",
-      variable: n,
-      date: null,
-      run: null,
-      forecastHour: 0,
-      visible: !0,
-      opacity: a.opacity ?? 1,
-      units: t.initialUnit || "imperial"
-    }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
+    const a = t.layerOptions || {}, r = a.variable || "2t_2", { colormap: c, baseUnit: _ } = this._getColormapForVariable(r);
+    this.baseLayerOptions = { ...a, variable: r, colormap: c, colormapBaseUnit: _ }, this.state = { model: a.model || "gfs", variable: r, date: null, run: null, forecastHour: 0, visible: !0, opacity: a.opacity ?? 1, units: t.initialUnit || "imperial" }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
   }
-  /**
-   * Gets the available variables for a specific model
-   * @param {string} modelName - The model to get variables for
-   * @returns {Array<string>} Array of variable codes
-   */
   getAvailableVariables(e = null) {
+    var a;
     const t = e || this.state.model;
-    return E[t]?.vars || [];
+    return ((a = c0[t]) == null ? void 0 : a.vars) || [];
   }
-  /**
-   * Gets a human-readable name for a variable
-   * @param {string} variableCode - The variable code (e.g., '2t_2')
-   * @returns {string} Human-readable name
-   */
   getVariableDisplayName(e) {
-    const t = R.fld[e];
-    return t?.displayName || t?.name || e;
+    const t = q.fld[e];
+    return (t == null ? void 0 : t.displayName) || (t == null ? void 0 : t.name) || e;
   }
   _handleWorkerMessage(e) {
-    const { success: t, requestId: a, decompressedData: n, encoding: r, error: o } = e.data;
+    const { success: t, requestId: a, decompressedData: r, encoding: c, error: _ } = e.data;
     if (this.workerResolvers.has(a)) {
-      const { resolve: s, reject: c } = this.workerResolvers.get(a);
-      t ? s({ data: n, encoding: r }) : c(new Error(o)), this.workerResolvers.delete(a);
+      const { resolve: n, reject: o } = this.workerResolvers.get(a);
+      t ? n({ data: r, encoding: c }) : o(new Error(_)), this.workerResolvers.delete(a);
     }
   }
-  // ========================================================================
-  // --- PUBLIC API METHODS ---
-  // ========================================================================
   play() {
     this.isPlaying || (this.isPlaying = !0, clearInterval(this.playIntervalId), this.playIntervalId = setInterval(() => {
       this.step(1);
@@ -12925,38 +13159,34 @@ class B extends L {
     this.isPlaying ? this.pause() : this.play();
   }
   step(e = 1) {
-    const { model: t, date: a, run: n, forecastHour: r } = this.state, o = this.modelStatus?.[t]?.[a]?.[n];
-    if (!o || o.length === 0) return;
-    const s = o.indexOf(r);
-    if (s === -1) return;
-    const c = o.length - 1;
-    let l = s + e;
-    l > c && (l = 0), l < 0 && (l = c), this.setState({ forecastHour: o[l] });
+    var p, b, g;
+    const { model: t, date: a, run: r, forecastHour: c } = this.state, _ = (g = (b = (p = this.modelStatus) == null ? void 0 : p[t]) == null ? void 0 : b[a]) == null ? void 0 : g[r];
+    if (!_ || _.length === 0) return;
+    const n = _.indexOf(c);
+    if (n === -1) return;
+    const o = _.length - 1;
+    let f = n + e;
+    f > o && (f = 0), f < 0 && (f = o), this.setState({ forecastHour: _[f] });
   }
   setPlaybackSpeed(e) {
     e > 0 && (this.playbackSpeed = e, this.isPlaying && this.play());
   }
   async setState(e) {
-    const t = e.model && e.model !== this.state.model, a = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), n = e.variable && e.variable !== this.state.variable;
-    Object.assign(this.state, e), (t || a || n) && (this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
-    const r = this.baseLayerOptions.colormap, o = this.baseLayerOptions.colormapBaseUnit, s = this._getTargetUnit(o, this.state.units), c = this._convertColormapUnits(r, o, s), { model: l, date: m, run: p } = this.state;
+    var g, w, m, s;
+    const t = e.model && e.model !== this.state.model, a = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), r = e.variable && e.variable !== this.state.variable;
+    Object.assign(this.state, e), (t || a || r) && (this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
+    const c = this.baseLayerOptions.colormap, _ = this.baseLayerOptions.colormapBaseUnit, n = this._getTargetUnit(_, this.state.units), o = this._convertColormapUnits(c, _, n), { model: f, date: p, run: b } = this.state;
     this.emit("state:change", {
       ...this.state,
       availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
-      availableRuns: this.modelStatus?.[l] || {},
-      availableHours: this.modelStatus?.[l]?.[m]?.[p] || [],
+      availableRuns: ((g = this.modelStatus) == null ? void 0 : g[f]) || {},
+      availableHours: ((s = (m = (w = this.modelStatus) == null ? void 0 : w[f]) == null ? void 0 : m[p]) == null ? void 0 : s[b]) || [],
       availableVariables: this.getAvailableVariables(),
       isPlaying: this.isPlaying,
-      colormap: c,
-      // Use the converted colormap
-      colormapBaseUnit: s
-      // And its corresponding unit name
-    }), this._loadAndRenderGrid(this.state), (t || a || n) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
+      colormap: o,
+      colormapBaseUnit: n
+    }), this._loadAndRenderGrid(this.state), (t || a || r) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
   }
-  /**
-   * A helper method to consolidate loading and rendering logic.
-   * @private
-   */
   async _loadAndRenderGrid(e) {
     const t = await this._loadGridData(e);
     if (t && t.data) {
@@ -12965,10 +13195,6 @@ class B extends L {
     } else
       this.removeLayer(this.layerId);
   }
-  /**
-   * Sets the active weather variable for the layer.
-   * @param {string} newVariable - The name of the variable to display (e.g., 'refc_0').
-   */
   async setVariable(e) {
     if (e === this.state.variable) return;
     const { colormap: t, baseUnit: a } = this._getColormapForVariable(e);
@@ -12976,7 +13202,7 @@ class B extends L {
   }
   async setModel(e) {
     if (e === this.state.model || !this.modelStatus || !this.modelStatus[e]) return;
-    const t = C(this.modelStatus, e);
+    const t = J(this.modelStatus, e);
     t && await this.setState({ model: e, date: t.date, run: t.run, forecastHour: 0 });
   }
   async setRun(e) {
@@ -12988,24 +13214,21 @@ class B extends L {
   }
   async initialize(e = {}) {
     await this.fetchModelStatus(!0);
-    const t = C(this.modelStatus, this.state.model);
+    const t = J(this.modelStatus, this.state.model);
     let a = this.state;
     t && (a = { ...this.state, ...t, forecastHour: 0 }), await this.setState(a), (e.autoRefresh ?? this.autoRefreshEnabled) && this.startAutoRefresh(e.refreshInterval ?? this.autoRefreshIntervalSeconds);
   }
-  // ========================================================================
-  // --- PRIVATE HELPER METHODS ---
-  // ========================================================================
   _getColormapForVariable(e) {
+    var c, _;
     const t = this.customColormaps[e];
     if (t) {
       if (t.units) {
-        const r = this.state.units;
+        const n = this.state.units;
         let o;
-        if (r === "imperial" && (o = "fahrenheit"), r === "metric" && (o = "celsius"), o && t.units[o]?.colormap)
+        if (n === "imperial" && (o = "fahrenheit"), n === "metric" && (o = "celsius"), o && ((c = t.units[o]) != null && c.colormap))
           return {
             colormap: t.units[o].colormap,
             baseUnit: o
-            // The base unit IS the target unit, so no conversion will be needed
           };
       }
       if (t.colormap && t.baseUnit)
@@ -13014,12 +13237,12 @@ class B extends L {
           baseUnit: t.baseUnit
         };
     }
-    const a = R.variable_cmap?.[e] || e, n = U[a];
-    if (n) {
-      const r = Object.keys(n.units)[0];
+    const a = ((_ = q.variable_cmap) == null ? void 0 : _[e]) || e, r = _0[a];
+    if (r) {
+      const n = Object.keys(r.units)[0];
       return {
-        colormap: n.units[r].colormap,
-        baseUnit: r
+        colormap: r.units[n].colormap,
+        baseUnit: n
       };
     }
     return console.warn(`[Manager] No custom or default colormap found for variable "${e}". Using fallback.`), {
@@ -13029,26 +13252,55 @@ class B extends L {
   }
   _convertColormapUnits(e, t, a) {
     if (t === a) return e;
-    const n = H(t, a);
-    if (!n) return e;
-    const r = [];
-    for (let o = 0; o < e.length; o += 2)
-      r.push(n(e[o]), e[o + 1]);
-    return r;
-  }
-  _updateOrCreateLayer(e, t, a, n) {
-    const { model: r, colormap: o, opacity: s = 1, visible: c = !0, units: l, variable: m } = t, p = A[r];
-    if (!p) {
-      console.error(`No grid configuration found for model: ${r}`);
-      return;
-    }
-    const _ = t.colormapBaseUnit, d = R.fld[m] || {}, u = this._getTargetUnit(_, l), h = this._convertColormapUnits(o, _, u), y = [h[0], h[h.length - 2]], v = d.defaultUnit || "none", k = this.layers.has(e), w = k ? this.layers.get(e).shaderLayer : new I(e);
-    k || (this.map.addLayer(w, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: w, options: t, visible: c })), w.updateDataTexture(a, n, p.grid_params.nx, p.grid_params.ny), w.updateColormapTexture(h), w.updateStyle({ opacity: c ? s : 0, dataRange: y }), w.setUnitConversion(v, l), this.map.triggerRepaint();
+    const r = s0(t, a);
+    if (!r) return e;
+    const c = [];
+    for (let _ = 0; _ < e.length; _ += 2)
+      c.push(r(e[_]), e[_ + 1]);
+    return c;
   }
   /**
-   * Helper to determine the target unit string for a given system.
+   * NEW: Replaces the old corner calculation with the more robust logic from your code.
    * @private
    */
+  _getGridCornersAndDef(e) {
+    const t = { ...n0[e], modelName: e };
+    if (!t) return null;
+    const { nx: a, ny: r } = t.grid_params, c = t.type;
+    let _;
+    if (c === "latlon") {
+      let { lon_first: n, lat_first: o, lat_last: f, lon_last: p, dx_degrees: b, dy_degrees: g } = t.grid_params;
+      _ = {
+        lon_tl: n,
+        lat_tl: o,
+        lon_tr: p !== void 0 ? p : n + (a - 1) * b,
+        lat_tr: o,
+        lon_bl: n,
+        lat_bl: f !== void 0 ? f : o + (r - 1) * g,
+        lon_br: p !== void 0 ? p : n + (a - 1) * b,
+        lat_br: f !== void 0 ? f : o + (r - 1) * g
+      };
+    } else if (c === "rotated_latlon") {
+      const [n, o] = $(t.grid_params.lon_first, t.grid_params.lat_first), [f, p] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first), [b, g] = $(t.grid_params.lon_first, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees), [w, m] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees);
+      _ = { lon_tl: n, lat_tl: o, lon_tr: f, lat_tr: p, lon_bl: b, lat_bl: g, lon_br: w, lat_br: m };
+    } else if (c === "lambert_conformal_conic" || c === "polar_stereographic") {
+      let n = Object.entries(t.proj_params).map(([C, v]) => `+${C}=${v}`).join(" ");
+      c === "polar_stereographic" && (n += " +lat_0=90");
+      const { x_origin: o, y_origin: f, dx: p, dy: b } = t.grid_params, [g, w] = j(n, "EPSG:4326", [o, f]), [m, s] = j(n, "EPSG:4326", [o + (a - 1) * p, f]), [A, P] = j(n, "EPSG:4326", [o, f + (r - 1) * b]), [z, S] = j(n, "EPSG:4326", [o + (a - 1) * p, f + (r - 1) * b]);
+      _ = { lon_tl: g, lat_tl: w, lon_tr: m, lat_tr: s, lon_bl: A, lat_bl: P, lon_br: z, lat_br: S };
+    } else
+      return null;
+    return { corners: _, gridDef: t };
+  }
+  _updateOrCreateLayer(e, t, a, r) {
+    const { model: c, colormap: _, opacity: n = 1, visible: o = !0, units: f, variable: p } = t, b = this._getGridCornersAndDef(c);
+    if (!b) {
+      console.error(`Could not generate geometry for model: ${c}`);
+      return;
+    }
+    const { corners: g, gridDef: w } = b, m = t.colormapBaseUnit, s = q.fld[p] || {}, A = this._getTargetUnit(m, f), P = this._convertColormapUnits(_, m, A), z = [P[0], P[P.length - 2]], S = s.defaultUnit || "none", C = this.layers.has(e), v = C ? this.layers.get(e).shaderLayer : new r0(e);
+    C || (this.map.addLayer(v, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: v, options: t, visible: o })), v.updateGeometry(g, w), v.updateDataTexture(a, r, w.grid_params.nx, w.grid_params.ny), v.updateColormapTexture(P), v.updateStyle({ opacity: o ? n : 0, dataRange: z }), v.setUnitConversion(S, f), this.map.triggerRepaint();
+  }
   _getTargetUnit(e, t) {
     if (t === "metric") {
       if (["°F", "°C"].includes(e)) return "celsius";
@@ -13057,55 +13309,30 @@ class B extends L {
     }
     return ["°F", "°C"].includes(e) ? "fahrenheit" : ["kts", "mph", "m/s"].includes(e) ? "mph" : ["in", "mm", "cm"].includes(e) ? "in" : e;
   }
-  async setModel(e) {
-    if (e === this.state.model) return;
-    if (!this.modelStatus || !this.modelStatus[e]) {
-      console.error(`[Manager] Model "${e}" is not available.`);
-      return;
-    }
-    const t = C(this.modelStatus, e);
-    t ? await this.setState({
-      model: e,
-      date: t.date,
-      run: t.run,
-      forecastHour: 0
-    }) : console.error(`[Manager] No runs found for model "${e}".`);
-  }
   createWorker() {
     const e = `
             import { decompress } from 'https://cdn.skypack.dev/fzstd@0.1.1';
-
             self.onmessage = async (e) => {
                 const { requestId, compressedData, encoding } = e.data;
                 try {
                     const decompressedDeltas = decompress(compressedData);
                     const expectedLength = encoding.length;
                     const reconstructedData = new Int8Array(expectedLength);
-
                     if (decompressedDeltas.length > 0 && expectedLength > 0) {
-                        reconstructedData[0] = decompressedDeltas[0] > 127 
-                            ? decompressedDeltas[0] - 256 
-                            : decompressedDeltas[0];
+                        reconstructedData[0] = decompressedDeltas[0] > 127 ? decompressedDeltas[0] - 256 : decompressedDeltas[0];
                         for (let i = 1; i < expectedLength; i++) {
-                            const delta = decompressedDeltas[i] > 127 
-                                ? decompressedDeltas[i] - 256 
-                                : decompressedDeltas[i];
+                            const delta = decompressedDeltas[i] > 127 ? decompressedDeltas[i] - 256 : decompressedDeltas[i];
                             reconstructedData[i] = reconstructedData[i - 1] + delta;
                         }
                     }
-
                     const finalData = new Uint8Array(reconstructedData.buffer);
-                    
-                    // Respond with the ID, the result, and the original encoding object.
                     self.postMessage({ 
                         success: true, 
                         requestId: requestId, 
                         decompressedData: finalData,
                         encoding: encoding 
                     }, [finalData.buffer]);
-
                 } catch (error) {
-                    // If it fails, still include the ID so the main thread knows which request failed.
                     self.postMessage({ 
                         success: false, 
                         requestId: requestId, 
@@ -13116,33 +13343,21 @@ class B extends L {
         `, t = new Blob([e], { type: "application/javascript" });
     return new Worker(URL.createObjectURL(t), { type: "module" });
   }
-  /**
-   * Preloads all forecast hour data for the currently selected model run.
-   * This is used by the 'preload' load strategy.
-   * @private
-   */
-  // Replace the existing _preloadCurrentRun method with this one.
   async _preloadCurrentRun() {
-    const { model: e, date: t, run: a } = this.state, n = this.modelStatus?.[e]?.[t]?.[a];
-    if (!n || n.length === 0)
-      return;
-    const r = n.map((o) => {
-      const s = { ...this.state, forecastHour: o };
-      return this._loadGridData(s);
+    var _, n, o;
+    const { model: e, date: t, run: a } = this.state, r = (o = (n = (_ = this.modelStatus) == null ? void 0 : _[e]) == null ? void 0 : n[t]) == null ? void 0 : o[a];
+    if (!r || r.length === 0) return;
+    const c = r.map((f) => {
+      const p = { ...this.state, forecastHour: f };
+      return this._loadGridData(p);
     });
-    await Promise.all(r);
+    await Promise.all(c);
   }
-  /**
-   * Fetches the model status JSON file from the server.
-   * @param {boolean} [force=false] - If true, fetches new data even if it's already loaded.
-   * @returns {Promise<object|null>} The model status data, or null on failure.
-   */
   async fetchModelStatus(e = !1) {
     if (!this.modelStatus || e)
       try {
         const t = await fetch(this.statusUrl);
-        if (!t.ok)
-          throw new Error(`HTTP error! Status: ${t.status}`);
+        if (!t.ok) throw new Error(`HTTP error! Status: ${t.status}`);
         const a = await t.json();
         this.modelStatus = a.models;
       } catch {
@@ -13150,54 +13365,40 @@ class B extends L {
       }
     return this.modelStatus;
   }
-  /**
-   * Starts a timer to automatically poll for the latest model status.
-   * @param {number} [intervalSeconds] - The refresh interval in seconds.
-   */
   startAutoRefresh(e) {
     const t = e ?? this.autoRefreshIntervalSeconds ?? 60;
     this.stopAutoRefresh(), this.autoRefreshIntervalId = setInterval(async () => {
       await this.fetchModelStatus(!0), this.emit("state:change", this.state);
     }, t * 1e3);
   }
-  /**
-   * Stops the automatic polling for model status updates.
-   */
   stopAutoRefresh() {
     this.autoRefreshIntervalId && (clearInterval(this.autoRefreshIntervalId), this.autoRefreshIntervalId = null);
   }
   async _loadGridData(e) {
-    const { model: t, date: a, run: n, forecastHour: r, variable: o, smoothing: s = 0 } = { ...this.baseLayerOptions, ...e }, c = `${t}-${a}-${n}-${r}-${o}-${s || ""}`;
-    if (this.dataCache.has(c))
-      return this.dataCache.get(c);
-    const l = new Promise(async (m, p) => {
-      const _ = `${this.baseUrl}/${t}/${a}/${n}/${r}/${o}/${s}`;
+    const { model: t, date: a, run: r, forecastHour: c, variable: _, smoothing: n = 0 } = { ...this.baseLayerOptions, ...e }, o = `${t}-${a}-${r}-${c}-${_}-${n || ""}`;
+    if (this.dataCache.has(o))
+      return this.dataCache.get(o);
+    const f = new Promise(async (p, b) => {
+      const g = `${this.baseUrl}/${t}/${a}/${r}/${c}/${_}/${n}`;
       try {
-        const d = await fetch(_);
-        if (!d.ok) throw new Error(`HTTP ${d.status} for ${_}`);
-        const { data: u, encoding: h } = await d.json(), y = Uint8Array.from(atob(u), (k) => k.charCodeAt(0)), v = this.workerRequestId++;
-        this.workerResolvers.set(v, { resolve: m, reject: p }), this.worker.postMessage({ requestId: v, compressedData: y, encoding: h }, [y.buffer]);
-      } catch (d) {
-        p(d);
+        const w = await fetch(g);
+        if (!w.ok) throw new Error(`HTTP ${w.status} for ${g}`);
+        const { data: m, encoding: s } = await w.json(), A = Uint8Array.from(atob(m), (z) => z.charCodeAt(0)), P = this.workerRequestId++;
+        this.workerResolvers.set(P, { resolve: p, reject: b }), this.worker.postMessage({ requestId: P, compressedData: A, encoding: s }, [A.buffer]);
+      } catch (w) {
+        b(w);
       }
-    }).then((m) => (this.dataCache.set(c, m), m)).catch((m) => (this.dataCache.delete(c), null));
-    return this.dataCache.set(c, l), l;
-  }
-  async setUnits(e) {
-    e === this.state.units || !["metric", "imperial"].includes(e) || await this.setState({ units: e });
+    }).then((p) => (this.dataCache.set(o, p), p)).catch((p) => (this.dataCache.delete(o), null));
+    return this.dataCache.set(o, f), f;
   }
   removeLayer(e) {
     this.layers.has(e) && (this.map.getLayer(e) && this.map.removeLayer(e), this.layers.delete(e));
   }
-  /**
-   * Cleans up all resources used by the manager.
-   * Removes the layer from the map, stops timers, and clears caches.
-   */
   destroy() {
     this.pause(), this.stopAutoRefresh(), this.removeLayer(this.layerId), this.dataCache.clear(), this.worker.terminate(), this.callbacks = {}, console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
   }
 }
-const D = {
+const l0 = {
   landOcean: {
     landColor: "#f0f0f0",
     oceanColor: "#a8d8ea",
@@ -13244,7 +13445,7 @@ const D = {
     accentColor: "#b0b0b0"
   },
   oceanOnTop: !1
-}, W = {
+}, f0 = {
   landOcean: {
     landColor: "#242424",
     oceanColor: "#252525",
@@ -13291,10 +13492,10 @@ const D = {
     accentColor: "#000000"
   },
   oceanOnTop: !1
-}, P = {
-  light: D,
-  dark: W
-}, f = {
+}, K = {
+  light: l0,
+  dark: f0
+}, L = {
   // Background and water layers
   landColor: { layerId: "AML_-_land" },
   oceanColor: { layerId: "AML_-_water" },
@@ -13321,58 +13522,58 @@ const D = {
   // Assuming point label for natural features
   subdivisionLabels: { layerId: "AML_-_subdivision-label" }
 };
-function b(i) {
+function D(i) {
   return typeof i == "string" && i.startsWith("#") && i.length === 9 ? i.substring(0, 7) : i;
 }
-const x = (i, e, t) => {
-  if (i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "line-color", b(t.color)), i.setPaintProperty(e, "line-width", t.width), t.lineType)) {
+const N = (i, e, t) => {
+  if (i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "line-color", D(t.color)), i.setPaintProperty(e, "line-width", t.width), t.lineType)) {
     const a = { dashed: [2, 2], dotted: [0, 2], solid: [] };
     i.setPaintProperty(e, "line-dasharray", a[t.lineType] || []);
   }
-}, g = (i, e, t) => {
-  i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "text-color", b(t.color)), i.setPaintProperty(e, "text-halo-color", b(t.outlineColor)), i.setPaintProperty(e, "text-halo-width", t.outlineWidth), i.setLayoutProperty(e, "text-size", t.fontSize), i.setLayoutProperty(e, "text-font", [t.fontFamily]));
+}, B = (i, e, t) => {
+  i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "text-color", D(t.color)), i.setPaintProperty(e, "text-halo-color", D(t.outlineColor)), i.setPaintProperty(e, "text-halo-width", t.outlineWidth), i.setLayoutProperty(e, "text-size", t.fontSize), i.setLayoutProperty(e, "text-font", [t.fontFamily]));
 };
-function M(i, e, t, a) {
-  a && i.getLayer(e) && (a.color && i.setPaintProperty(e, t, b(a.color)), a.visible !== void 0 && i.setLayoutProperty(e, "visibility", a.visible ? "visible" : "none"));
+function e0(i, e, t, a) {
+  a && i.getLayer(e) && (a.color && i.setPaintProperty(e, t, D(a.color)), a.visible !== void 0 && i.setLayoutProperty(e, "visibility", a.visible ? "visible" : "none"));
 }
-function z(i, e) {
+function t0(i, e) {
   if (!(!i || !i.isStyleLoaded())) {
     if (e.landOcean) {
-      const { landColor: t, oceanColor: a, waterDepth: n, nationalPark: r } = e.landOcean;
-      i.getLayer(f.landColor.layerId) && i.setPaintProperty(f.landColor.layerId, "background-color", b(t)), i.getLayer(f.oceanColor.layerId) && i.setPaintProperty(f.oceanColor.layerId, "fill-color", b(a)), M(i, f.waterDepth.layerId, "fill-color", n), M(i, f.nationalPark.layerId, "fill-color", r);
+      const { landColor: t, oceanColor: a, waterDepth: r, nationalPark: c } = e.landOcean;
+      i.getLayer(L.landColor.layerId) && i.setPaintProperty(L.landColor.layerId, "background-color", D(t)), i.getLayer(L.oceanColor.layerId) && i.setPaintProperty(L.oceanColor.layerId, "fill-color", D(a)), e0(i, L.waterDepth.layerId, "fill-color", r), e0(i, L.nationalPark.layerId, "fill-color", c);
     }
-    e.transportation && (x(i, f.roads.layerId, e.transportation.roads), x(i, f.airports.layerId, e.transportation.airports)), e.boundaries && (x(i, f.countries.layerId, e.boundaries.countries), x(i, f.states.layerId, e.boundaries.states), x(i, f.counties.layerId, e.boundaries.counties)), e.waterFeatures && x(i, f.waterways.layerId, e.waterFeatures.waterways), e.labels && (g(i, f.continents.layerId, e.labels.continents), g(i, f.countriesLabels.layerId, e.labels.countries), g(i, f.statesLabels.layerId, e.labels.states), g(i, f.citiesMajor.layerId, e.labels.cities.major), g(i, f.citiesMinor.layerId, e.labels.cities.minor), g(i, f.airportsLabels.layerId, e.labels.airports), g(i, f.poi.layerId, e.labels.poi), g(i, f.waterLabels.layerId, e.labels.waterLabels), g(i, f.naturalLabels.layerId, e.labels.naturalLabels), g(i, f.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && i.getSource("mapbox-dem") && (e.terrain.visible ? (i.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), i.getLayer("hillshade") && (i.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), i.setPaintProperty("hillshade", "hillshade-shadow-color", b(e.terrain.shadowColor)), i.setPaintProperty("hillshade", "hillshade-highlight-color", b(e.terrain.highlightColor)), i.setPaintProperty("hillshade", "hillshade-accent-color", b(e.terrain.accentColor)))) : i.setTerrain(null));
+    e.transportation && (N(i, L.roads.layerId, e.transportation.roads), N(i, L.airports.layerId, e.transportation.airports)), e.boundaries && (N(i, L.countries.layerId, e.boundaries.countries), N(i, L.states.layerId, e.boundaries.states), N(i, L.counties.layerId, e.boundaries.counties)), e.waterFeatures && N(i, L.waterways.layerId, e.waterFeatures.waterways), e.labels && (B(i, L.continents.layerId, e.labels.continents), B(i, L.countriesLabels.layerId, e.labels.countries), B(i, L.statesLabels.layerId, e.labels.states), B(i, L.citiesMajor.layerId, e.labels.cities.major), B(i, L.citiesMinor.layerId, e.labels.cities.minor), B(i, L.airportsLabels.layerId, e.labels.airports), B(i, L.poi.layerId, e.labels.poi), B(i, L.waterLabels.layerId, e.labels.waterLabels), B(i, L.naturalLabels.layerId, e.labels.naturalLabels), B(i, L.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && i.getSource("mapbox-dem") && (e.terrain.visible ? (i.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), i.getLayer("hillshade") && (i.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), i.setPaintProperty("hillshade", "hillshade-shadow-color", D(e.terrain.shadowColor)), i.setPaintProperty("hillshade", "hillshade-highlight-color", D(e.terrain.highlightColor)), i.setPaintProperty("hillshade", "hillshade-accent-color", D(e.terrain.accentColor)))) : i.setTerrain(null));
   }
 }
-function T(i, e) {
+function Z(i, e) {
   const t = { ...i };
-  return S(i) && S(e) && Object.keys(e).forEach((a) => {
-    S(e[a]) ? a in i ? t[a] = T(i[a], e[a]) : Object.assign(t, { [a]: e[a] }) : Object.assign(t, { [a]: e[a] });
+  return X(i) && X(e) && Object.keys(e).forEach((a) => {
+    X(e[a]) ? a in i ? t[a] = Z(i[a], e[a]) : Object.assign(t, { [a]: e[a] }) : Object.assign(t, { [a]: e[a] });
   }), t;
 }
-function S(i) {
+function X(i) {
   return i && typeof i == "object" && !Array.isArray(i);
 }
-const V = "mapbox://styles/aguacerowx/cmfvox8mq004u01qm5nlg7qkt";
-class N extends L {
+const p0 = "mapbox://styles/aguacerowx/cmfvox8mq004u01qm5nlg7qkt";
+class u0 extends i0 {
   constructor(e, t = {}) {
     if (super(), !e || !t.accessToken)
       throw new Error("A container ID and a Mapbox access token are required.");
     mapboxgl.accessToken = t.accessToken;
-    let a = JSON.parse(JSON.stringify(P.light)), n = JSON.parse(JSON.stringify(P.dark));
-    t.customStyles && (console.log("[MapManager] Custom styles provided. Merging..."), t.customStyles.light && (a = T(a, t.customStyles.light)), t.customStyles.dark && (n = T(n, t.customStyles.dark)), console.log("[MapManager] Final merged dark theme:", n)), this.themes = {
+    let a = JSON.parse(JSON.stringify(K.light)), r = JSON.parse(JSON.stringify(K.dark));
+    t.customStyles && (console.log("[MapManager] Custom styles provided. Merging..."), t.customStyles.light && (a = Z(a, t.customStyles.light)), t.customStyles.dark && (r = Z(r, t.customStyles.dark)), console.log("[MapManager] Final merged dark theme:", r)), this.themes = {
       light: a,
-      dark: n
+      dark: r
     };
-    const r = t.defaultTheme || "light";
-    this.currentCustomizations = this.themes[r], this.currentThemeName = r, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
+    const c = t.defaultTheme || "light";
+    this.currentCustomizations = this.themes[c], this.currentThemeName = c, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
       container: e,
-      style: V,
+      style: p0,
       center: [-98, 39],
       zoom: 3.5,
       ...t.mapOptions
     }), this.map.on("load", () => {
-      console.log("[MapManager] Map loaded. Applying initial theme:", r), z(this.map, this.currentCustomizations), this.emit("style:applied", {
+      console.log("[MapManager] Map loaded. Applying initial theme:", c), t0(this.map, this.currentCustomizations), this.emit("style:applied", {
         themeName: this.currentThemeName,
         styles: this.currentCustomizations
       });
@@ -13380,6 +13581,7 @@ class N extends L {
   }
   // The rest of the methods (setTheme, setLabelGroupVisibility, etc.) are correct and remain unchanged...
   setTheme(e) {
+    var r, c, _;
     if (!this.themes[e]) {
       console.error(`[MapManager] Theme "${e}" does not exist.`);
       return;
@@ -13387,27 +13589,28 @@ class N extends L {
     const t = JSON.parse(JSON.stringify(this.themes[e])), a = this.currentCustomizations.labels;
     if (a)
       for (const n in a) {
-        a[n]?.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = a[n].visible);
-        for (const r in a[n])
-          a[n][r]?.hasOwnProperty("visible") && t.labels[n]?.[r] && (t.labels[n][r].visible = a[n][r].visible);
+        (r = a[n]) != null && r.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = a[n].visible);
+        for (const o in a[n])
+          (c = a[n][o]) != null && c.hasOwnProperty("visible") && ((_ = t.labels[n]) != null && _[o]) && (t.labels[n][o].visible = a[n][o].visible);
       }
-    this.currentCustomizations = t, this.currentThemeName = e, z(this.map, this.currentCustomizations), this.emit("style:applied", {
+    this.currentCustomizations = t, this.currentThemeName = e, t0(this.map, this.currentCustomizations), this.emit("style:applied", {
       themeName: this.currentThemeName,
       styles: this.currentCustomizations
     });
   }
   setLabelGroupVisibility(e, t) {
+    var o;
     const a = `labels.${e}.visible`;
-    let n = this.currentCustomizations;
-    const r = a.split(".");
-    for (let c = 0; c < r.length - 1; c++)
-      if (n = n[r[c]], !n) {
+    let r = this.currentCustomizations;
+    const c = a.split(".");
+    for (let f = 0; f < c.length - 1; f++)
+      if (r = r[c[f]], !r) {
         console.error(`Invalid label group key: ${e}`);
         return;
       }
-    n[r[r.length - 1]] = t;
-    const o = e.replace(/\.(.)/g, (c, l) => l.toUpperCase()), s = f[o]?.layerId;
-    s && this.map.getLayer(s) ? (this.map.setLayoutProperty(s, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${s} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${o})`);
+    r[c[c.length - 1]] = t;
+    const _ = e.replace(/\.(.)/g, (f, p) => p.toUpperCase()), n = (o = L[_]) == null ? void 0 : o.layerId;
+    n && this.map.getLayer(n) ? (this.map.setLayoutProperty(n, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${n} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${_})`);
   }
   addWeatherManager(e) {
     this.weatherLayerManagers.set(e.layerId, e);
@@ -13417,6 +13620,6 @@ class N extends L {
   }
 }
 export {
-  B as FillLayerManager,
-  N as MapManager
+  h0 as FillLayerManager,
+  u0 as MapManager
 };
