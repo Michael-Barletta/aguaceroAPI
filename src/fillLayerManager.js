@@ -134,41 +134,86 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
+    /**
+     * Lightweight update path for when only the forecast hour changes.
+     * This method fetches new grid data and updates the GPU texture without
+     * recalculating the underlying map geometry.
+     * @private
+     */
+    async _updateLayerData(state) {
+        const grid = await this._loadGridData(state);
+        const layer = this.layers.get(this.layerId);
+
+        if (grid && grid.data && layer) {
+            const { shaderLayer } = layer;
+            const gridDef = this._getGridCornersAndDef(state.model).gridDef;
+
+            // 1. Update ONLY the data texture
+            shaderLayer.updateDataTexture(
+                grid.data, 
+                grid.encoding, 
+                gridDef.grid_params.nx, 
+                gridDef.grid_params.ny
+            );
+            
+            // 2. Ensure opacity is correct
+            shaderLayer.updateStyle({ opacity: this.state.opacity });
+            
+            // 3. Trigger a repaint
+            this.map.triggerRepaint();
+        }
+    }
+
     async setState(newState) {
         const modelChanged = newState.model && newState.model !== this.state.model;
         const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
         const variableChanged = newState.variable && newState.variable !== this.state.variable;
+        const hourChanged = newState.forecastHour !== undefined && newState.forecastHour !== this.state.forecastHour;
 
+        // *** NEW LOGIC: Determine if this is a lightweight update ***
+        const isOnlyTimeChange = hourChanged && !modelChanged && !runChanged && !variableChanged;
+
+        // Update the internal state immediately
+        const previousState = { ...this.state };
         Object.assign(this.state, newState);
 
+        // If the model or run changed, clear the cache as the data is no longer relevant
         if (modelChanged || runChanged || variableChanged) {
             if (this.layers.has(this.layerId)) {
+                // Immediately hide the old layer to prevent showing stale data
                 this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 });
                 this.map.triggerRepaint();
             }
             this.dataCache.clear();
         }
 
+        // --- Emit state change event for the UI (this part remains the same) ---
         const baseColormap = this.baseLayerOptions.colormap;
         const fromUnit = this.baseLayerOptions.colormapBaseUnit;
         const toUnit = this._getTargetUnit(fromUnit, this.state.units);
-        
         const displayColormap = this._convertColormapUnits(baseColormap, fromUnit, toUnit);
-
-        const { model, date, run } = this.state;
         this.emit('state:change', {
+            /* ... all the state properties for the UI ... */
             ...this.state,
             availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
-            availableRuns: this.modelStatus?.[model] || {},
-            availableHours: this.modelStatus?.[model]?.[date]?.[run] || [],
-            availableVariables: this.getAvailableVariables(),
+            availableRuns: this.modelStatus?.[this.state.model] || {},
+            availableHours: this.modelStatus?.[this.state.model]?.[this.state.date]?.[this.state.run] || [],
             isPlaying: this.isPlaying,
             colormap: displayColormap,
             colormapBaseUnit: toUnit,
         });
+        // --- End of UI state emission ---
 
-        this._loadAndRenderGrid(this.state);
+        // *** HERE IS THE CRITICAL FORK IN LOGIC ***
+        if (isOnlyTimeChange) {
+            // Lightweight path: Only update the texture data
+            await this._updateLayerData(this.state);
+        } else {
+            // Heavy path: Re-evaluate the entire layer, including geometry
+            await this._loadAndRenderGrid(this.state);
+        }
         
+        // Preloading logic can remain the same
         if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload') {
             setTimeout(() => this._preloadCurrentRun(), 0);
         }

@@ -12,12 +12,12 @@ class i0 {
     a && a.forEach((r) => r(t));
   }
 }
-const V = 89;
+const N = 89;
 function a0(i, e) {
-  const a = 245.305142, r = Math.PI / 180, c = 180 / Math.PI, _ = 53.91148 * r, n = i * r, o = e * r, f = Math.sin(o), p = Math.cos(o), b = Math.sin(n), g = Math.cos(n), w = Math.sin(_), m = Math.cos(_), s = m * f + w * p * g;
-  let A = Math.asin(s) * c;
-  const P = p * b, z = -w * f + m * p * g;
-  let S = Math.atan2(P, z) * c + a;
+  const a = 245.305142, r = Math.PI / 180, s = 180 / Math.PI, _ = 53.91148 * r, o = i * r, n = e * r, f = Math.sin(n), p = Math.cos(n), g = Math.sin(o), b = Math.cos(o), w = Math.sin(_), m = Math.cos(_), c = m * f + w * p * b;
+  let A = Math.asin(c) * s;
+  const P = p * g, z = -w * f + m * p * b;
+  let S = Math.atan2(P, z) * s + a;
   return S > 180 ? S -= 360 : S < -180 && (S += 360), [S, A];
 }
 class r0 {
@@ -86,10 +86,10 @@ class r0 {
                 }
 
                 gl_FragColor = vec4(color.rgb, color.a * u_opacity);
-            }`, c = t.createShader(t.VERTEX_SHADER);
-    t.shaderSource(c, a), t.compileShader(c);
+            }`, s = t.createShader(t.VERTEX_SHADER);
+    t.shaderSource(s, a), t.compileShader(s);
     const _ = t.createShader(t.FRAGMENT_SHADER);
-    t.shaderSource(_, r), t.compileShader(_), this.program = t.createProgram(), t.attachShader(this.program, c), t.attachShader(this.program, _), t.linkProgram(this.program), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.cachedCorners && this.cachedGridDef && this.updateGeometry(this.cachedCorners, this.cachedGridDef);
+    t.shaderSource(_, r), t.compileShader(_), this.program = t.createProgram(), t.attachShader(this.program, s), t.attachShader(this.program, _), t.linkProgram(this.program), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.cachedCorners && this.cachedGridDef && this.updateGeometry(this.cachedCorners, this.cachedGridDef);
   }
   updateGeometry(e, t) {
     if (this.cachedCorners = e, this.cachedGridDef = t, !this.gl || !this.vertexBuffer) return;
@@ -103,15 +103,15 @@ class r0 {
       e.lat_bl,
       e.lon_br,
       e.lat_br
-    ].some((n) => !isFinite(n))) {
+    ].some((o) => !isFinite(o))) {
       console.error("[GridLayer] Invalid corner coordinates:", e);
       return;
     }
     const _ = t.type;
     if (_ === "latlon") {
-      const n = [], o = [], f = e.lat_tl < e.lat_bl, p = t.grid_params && t.grid_params.lon_first === 336.5 && Math.abs(t.grid_params.lat_first) === 29.5, b = t.grid_params && t.grid_params.lon_first === 356.06 && Math.abs(t.grid_params.lat_first) === 43.18, g = t.grid_params && t.grid_params.lon_first === 0 && Math.abs(t.grid_params.lat_first) === 90, w = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === 90, m = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === -90 && t.grid_params.lon_last === 179.85;
-      let s = e;
-      if (g ? (s = {
+      const o = [], n = [], f = e.lat_tl < e.lat_bl, p = t.grid_params && t.grid_params.lon_first === 336.5 && Math.abs(t.grid_params.lat_first) === 29.5, g = t.grid_params && t.grid_params.lon_first === 356.06 && Math.abs(t.grid_params.lat_first) === 43.18, b = t.grid_params && t.grid_params.lon_first === 0 && Math.abs(t.grid_params.lat_first) === 90, w = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === 90, m = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === -90 && t.grid_params.lon_last === 179.85;
+      let c = e;
+      if (b ? (c = {
         lon_tl: e.lon_tl - 180,
         lat_tl: e.lat_tl,
         lon_tr: e.lon_tr - 180,
@@ -120,9 +120,9 @@ class r0 {
         lat_bl: e.lat_bl,
         lon_br: e.lon_br - 180,
         lat_br: e.lat_br
-      }, Object.keys(s).forEach((C) => {
-        C.startsWith("lon_") && s[C] < -180 && (s[C] += 360);
-      })) : w ? s = {
+      }, Object.keys(c).forEach((C) => {
+        C.startsWith("lon_") && c[C] < -180 && (c[C] += 360);
+      })) : w ? c = {
         lon_tl: e.lon_tl >= 180 ? e.lon_tl - 360 : e.lon_tl,
         lat_tl: e.lat_tl,
         lon_tr: e.lon_tr >= 180 ? e.lon_tr - 360 : e.lon_tr,
@@ -131,7 +131,7 @@ class r0 {
         lat_bl: e.lat_bl,
         lon_br: e.lon_br >= 180 ? e.lon_br - 360 : e.lon_br,
         lat_br: e.lat_br
-      } : m && (s = e), Math.abs(s.lon_tr - s.lon_tl) >= 359 || m) {
+      } : m && (c = e), Math.abs(c.lon_tr - c.lon_tl) >= 359 || m) {
         const C = r * 3;
         for (let h = 0; h <= r; h++)
           for (let T = 0; T <= C; T++) {
@@ -139,56 +139,56 @@ class r0 {
             let k;
             m ? k = 1 - h / r : k = f ? 1 - h / r : h / r;
             let u, l;
-            u = s.lon_tl - 360, l = s.lon_tr + 360;
-            const R = l - u, F = u + T / C * R, d = h / r, y = s.lat_tl + d * (s.lat_bl - s.lat_tl);
+            u = c.lon_tl - 360, l = c.lon_tr + 360;
+            const R = l - u, F = u + T / C * R, d = h / r, y = c.lat_tl + d * (c.lat_bl - c.lat_tl);
             if (!isFinite(F) || !isFinite(y))
               continue;
             const M = Q.fromLngLat({ lon: F, lat: y });
-            !isFinite(M.x) || !isFinite(M.y) || n.push(M.x, M.y, x, k);
+            !isFinite(M.x) || !isFinite(M.y) || o.push(M.x, M.y, x, k);
           }
         const v = C + 1;
         for (let h = 0; h < r; h++)
           for (let T = 0; T < C; T++) {
             const x = h * v + T, k = x + 1, u = (h + 1) * v + T, l = u + 1;
-            l < n.length / 4 && (o.push(x, u, k), o.push(k, u, l));
+            l < o.length / 4 && (n.push(x, u, k), n.push(k, u, l));
           }
       } else {
         if ([
-          s.lon_tl,
-          s.lat_tl,
-          s.lon_tr,
-          s.lat_tr,
-          s.lon_bl,
-          s.lat_bl,
-          s.lon_br,
-          s.lat_br
+          c.lon_tl,
+          c.lat_tl,
+          c.lon_tr,
+          c.lat_tr,
+          c.lon_bl,
+          c.lat_bl,
+          c.lon_br,
+          c.lat_br
         ].some((x) => !isFinite(x))) {
-          console.error("[GridLayer] Invalid adjusted corner coordinates:", s);
+          console.error("[GridLayer] Invalid adjusted corner coordinates:", c);
           return;
         }
-        if ([s.lat_tl, s.lat_tr, s.lat_bl, s.lat_br].some((x) => x < -90 || x > 90)) {
-          console.error("[GridLayer] Invalid latitude values in corners:", s), console.error("[GridLayer] Original corners were:", e), console.error("[GridLayer] Grid definition:", t);
+        if ([c.lat_tl, c.lat_tr, c.lat_bl, c.lat_br].some((x) => x < -90 || x > 90)) {
+          console.error("[GridLayer] Invalid latitude values in corners:", c), console.error("[GridLayer] Original corners were:", e), console.error("[GridLayer] Grid definition:", t);
           return;
         }
-        const T = Math.abs(s.lon_tr - s.lon_tl) > 180;
+        const T = Math.abs(c.lon_tr - c.lon_tl) > 180;
         for (let x = 0; x <= r; x++)
           for (let k = 0; k <= r; k++) {
             const u = k / r, l = x / r;
             let R = u, F;
-            f && !b && !p ? F = 1 - l : F = l;
+            f && !g && !p ? F = 1 - l : F = l;
             let d, y;
             if (T) {
-              let U = s.lon_tl, E = s.lon_tr, G = s.lon_bl, H = s.lon_br;
+              let U = c.lon_tl, E = c.lon_tr, G = c.lon_bl, H = c.lon_br;
               for (E < U && (E += 360), H < G && (H += 360), d = (1 - l) * ((1 - u) * U + u * E) + l * ((1 - u) * G + u * H); d > 180; ) d -= 360;
               for (; d < -180; ) d += 360;
             } else
-              d = (1 - l) * ((1 - u) * s.lon_tl + u * s.lon_tr) + l * ((1 - u) * s.lon_bl + u * s.lon_br);
-            if (y = (1 - l) * ((1 - u) * s.lat_tl + u * s.lat_tr) + l * ((1 - u) * s.lat_bl + u * s.lat_br), y = Math.max(-V, Math.min(V, y)), !isFinite(d) || !isFinite(y)) {
+              d = (1 - l) * ((1 - u) * c.lon_tl + u * c.lon_tr) + l * ((1 - u) * c.lon_bl + u * c.lon_br);
+            if (y = (1 - l) * ((1 - u) * c.lat_tl + u * c.lat_tr) + l * ((1 - u) * c.lat_bl + u * c.lat_br), y = Math.max(-N, Math.min(N, y)), !isFinite(d) || !isFinite(y)) {
               console.error(`[GridLayer] Invalid interpolated coordinates at ${x},${k}: lon=${d}, lat=${y}`), console.error("[GridLayer] Interpolation inputs:", {
                 t_x: u,
                 t_y: l,
-                corners: s,
-                gridType: g ? "GFS" : w ? "ECMWF" : isIconModel ? "ICON" : "OTHER"
+                corners: c,
+                gridType: b ? "GFS" : w ? "ECMWF" : isIconModel ? "ICON" : "OTHER"
               });
               continue;
             }
@@ -200,37 +200,37 @@ class r0 {
               console.error(`[GridLayer] Invalid Mercator coordinates: x=${I.x}, y=${I.y}`);
               continue;
             }
-            n.push(I.x, I.y, R, F);
+            o.push(I.x, I.y, R, F);
           }
         for (let x = 0; x < r; x++)
           for (let k = 0; k < r; k++) {
             const u = x * (r + 1) + k, l = u + 1, R = (x + 1) * (r + 1) + k, F = R + 1;
-            o.push(u, R, l), o.push(l, R, F);
+            n.push(u, R, l), n.push(l, R, F);
           }
       }
-      const z = new Float32Array(n);
+      const z = new Float32Array(o);
       a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, z, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
-      const S = new Uint16Array(o);
-      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexCount = o.length, this.vertexCount = n.length / 4;
+      const S = new Uint16Array(n);
+      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexCount = n.length, this.vertexCount = o.length / 4;
     } else if (_ === "rotated_latlon") {
       t.proj_params;
-      const n = [], o = [], { lon_first: f, lat_first: p, dx_degrees: b, dy_degrees: g, nx: w, ny: m } = t.grid_params, s = f, A = p, P = f + (w - 1) * b, z = p + (m - 1) * g;
+      const o = [], n = [], { lon_first: f, lat_first: p, dx_degrees: g, dy_degrees: b, nx: w, ny: m } = t.grid_params, c = f, A = p, P = f + (w - 1) * g, z = p + (m - 1) * b;
       for (let v = 0; v <= r; v++)
         for (let h = 0; h <= r; h++) {
-          const T = h / r, x = v / r, k = s + T * (P - s), u = A + x * (z - A);
+          const T = h / r, x = v / r, k = c + T * (P - c), u = A + x * (z - A);
           try {
             const [l, R] = a0(k, u);
             if (!isFinite(l) || !isFinite(R)) {
               console.warn(`[GridLayer] Invalid HRDPS transformed coordinates at ${v},${h}: lon=${l}, lat=${R}`);
               continue;
             }
-            const F = Math.max(-V, Math.min(V, R)), d = Q.fromLngLat({ lon: l, lat: F });
+            const F = Math.max(-N, Math.min(N, R)), d = Q.fromLngLat({ lon: l, lat: F });
             if (!isFinite(d.x) || !isFinite(d.y)) {
               console.warn(`[GridLayer] Invalid HRDPS Mercator coordinates: x=${d.x}, y=${d.y}`);
               continue;
             }
             const y = T, M = 1 - x;
-            n.push(d.x, d.y, y, M);
+            o.push(d.x, d.y, y, M);
           } catch (l) {
             console.warn(`[GridLayer] HRDPS manual transformation error at ${v},${h}:`, l);
             continue;
@@ -239,26 +239,26 @@ class r0 {
       for (let v = 0; v < r; v++)
         for (let h = 0; h < r; h++) {
           const T = v * (r + 1) + h, x = T + 1, k = (v + 1) * (r + 1) + h, u = k + 1;
-          u < n.length / 4 && (o.push(T, k, x), o.push(x, k, u));
+          u < o.length / 4 && (n.push(T, k, x), n.push(x, k, u));
         }
-      const S = new Float32Array(n);
+      const S = new Float32Array(o);
       a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
-      const C = new Uint16Array(o);
-      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, C, a.STATIC_DRAW), this.indexCount = o.length, this.vertexCount = n.length / 4;
+      const C = new Uint16Array(n);
+      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, C, a.STATIC_DRAW), this.indexCount = n.length, this.vertexCount = o.length / 4;
     } else if (_ === "polar_stereographic") {
-      const n = t.proj_params;
-      let o = `+proj=${n.proj}`;
-      Object.keys(n).forEach((l) => {
-        l !== "proj" && (o += ` +${l}=${n[l]}`);
-      }), o += " +lat_0=90 +no_defs";
-      const f = "EPSG:4326", { nx: p, ny: b, dx: g, dy: w, x_origin: m, y_origin: s } = t.grid_params, A = m, P = m + (p - 1) * g, z = s, S = s + (b - 1) * w, C = [], v = [], h = [];
+      const o = t.proj_params;
+      let n = `+proj=${o.proj}`;
+      Object.keys(o).forEach((l) => {
+        l !== "proj" && (n += ` +${l}=${o[l]}`);
+      }), n += " +lat_0=90 +no_defs";
+      const f = "EPSG:4326", { nx: p, ny: g, dx: b, dy: w, x_origin: m, y_origin: c } = t.grid_params, A = m, P = m + (p - 1) * b, z = c, S = c + (g - 1) * w, C = [], v = [], h = [];
       let T = 0, x = NaN;
       for (let l = 0; l <= r; l++) {
         h[l] = [];
         for (let R = 0; R <= r; R++) {
           const F = R / r, d = l / r, y = A + F * (P - A), M = z + d * (S - z);
           try {
-            const [I, U] = j(o, f, [y, M]);
+            const [I, U] = j(n, f, [y, M]);
             if (!isFinite(I) || !isFinite(U)) {
               h[l][R] = null;
               continue;
@@ -275,19 +275,19 @@ class r0 {
                 E += 360;
             }
             x = E;
-            const G = Math.max(-V, Math.min(V, U)), H = Q.fromLngLat({ lon: E, lat: G });
+            const G = Math.max(-N, Math.min(N, U)), H = Q.fromLngLat({ lon: E, lat: G });
             if (!isFinite(H.x) || !isFinite(H.y)) {
               h[l][R] = null;
               continue;
             }
-            const W = F, O = d;
+            const D = F, O = d;
             h[l][R] = {
               mercator_x: H.x,
               mercator_y: H.y,
-              tex_u: W,
+              tex_u: D,
               tex_v: O,
               vertexIndex: T
-            }, C.push(H.x, H.y, W, O), T++;
+            }, C.push(H.x, H.y, D, O), T++;
           } catch {
             h[l][R] = null;
             continue;
@@ -316,12 +316,12 @@ class r0 {
       const u = new Uint16Array(v);
       a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, u, a.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = C.length / 4;
     } else if (_ === "lambert_conformal_conic") {
-      const n = t.proj_params;
-      let o = `+proj=${n.proj}`;
-      Object.keys(n).forEach((d) => {
-        d !== "proj" && (o += ` +${d}=${n[d]}`);
-      }), o += " +no_defs";
-      const f = "EPSG:4326", { nx: p, ny: b, dx: g, dy: w, x_origin: m, y_origin: s } = t.grid_params, A = m, P = s, z = m + (p - 1) * g, S = s + (b - 1) * w, C = [], v = [];
+      const o = t.proj_params;
+      let n = `+proj=${o.proj}`;
+      Object.keys(o).forEach((d) => {
+        d !== "proj" && (n += ` +${d}=${o[d]}`);
+      }), n += " +no_defs";
+      const f = "EPSG:4326", { nx: p, ny: g, dx: b, dy: w, x_origin: m, y_origin: c } = t.grid_params, A = m, P = c, z = m + (p - 1) * b, S = c + (g - 1) * w, C = [], v = [];
       let h = 1 / 0, T = -1 / 0, x = 1 / 0, k = -1 / 0, u = 0;
       const l = [];
       for (let d = 0; d <= r; d++)
@@ -330,25 +330,25 @@ class r0 {
         for (let y = 0; y <= r; y++) {
           const M = y / r, I = d / r, U = A + M * (z - A), E = P + I * (S - P);
           try {
-            const [G, H] = j(o, f, [U, E]);
+            const [G, H] = j(n, f, [U, E]);
             if (G > 0) {
               console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${G} at [${d},${y}]`), l[d][y] = null;
               continue;
             }
             h = Math.min(h, G), T = Math.max(T, G), x = Math.min(x, H), k = Math.max(k, H);
-            const W = Q.fromLngLat({ lon: G, lat: H });
-            if (!isFinite(W.x) || !isFinite(W.y)) {
+            const D = Q.fromLngLat({ lon: G, lat: H });
+            if (!isFinite(D.x) || !isFinite(D.y)) {
               l[d][y] = null;
               continue;
             }
             const O = M, Y = I;
             l[d][y] = {
-              mercator_x: W.x,
-              mercator_y: W.y,
+              mercator_x: D.x,
+              mercator_y: D.y,
               tex_u: O,
               tex_v: Y,
               vertexIndex: u
-            }, C.push(W.x, W.y, O, Y), u++;
+            }, C.push(D.x, D.y, O, Y), u++;
           } catch (G) {
             console.warn(`[GridLayer] Projection error at [${d},${y}] with coords [${U}, ${E}]:`, G), l[d][y] = null;
             continue;
@@ -384,30 +384,30 @@ class r0 {
   updateDataTexture(e, t, a, r) {
     if (!this.gl) return;
     this.encoding = t, this.textureWidth = a, this.textureHeight = r;
-    const c = new Uint8Array(e.length);
-    for (let n = 0; n < e.length; n++) {
-      const o = e[n] > 127 ? e[n] - 256 : e[n];
-      c[n] = o + 128;
+    const s = new Uint8Array(e.length);
+    for (let o = 0; o < e.length; o++) {
+      const n = e[o] > 127 ? e[o] - 256 : e[o];
+      s[o] = n + 128;
     }
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture), this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, a, r, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, c), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture), this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, a, r, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, s), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
     const _ = this.isGlobal ? this.gl.REPEAT : this.gl.CLAMP_TO_EDGE;
     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, _), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
   updateColormapTexture(e) {
     if (!this.gl) return;
-    const t = 256, a = new Uint8Array(t * 4), r = e.reduce((o, f, p) => p % 2 === 0 ? [...o, { value: e[p], color: e[p + 1] }] : o, []);
+    const t = 256, a = new Uint8Array(t * 4), r = e.reduce((n, f, p) => p % 2 === 0 ? [...n, { value: e[p], color: e[p + 1] }] : n, []);
     if (r.length === 0) return;
-    const c = r[0].value, _ = r[r.length - 1].value, n = (o) => [parseInt(o.slice(1, 3), 16), parseInt(o.slice(3, 5), 16), parseInt(o.slice(5, 7), 16)];
-    for (let o = 0; o < t; o++) {
-      const f = c + o / (t - 1) * (_ - c);
-      let p = r[0], b = r[r.length - 1];
+    const s = r[0].value, _ = r[r.length - 1].value, o = (n) => [parseInt(n.slice(1, 3), 16), parseInt(n.slice(3, 5), 16), parseInt(n.slice(5, 7), 16)];
+    for (let n = 0; n < t; n++) {
+      const f = s + n / (t - 1) * (_ - s);
+      let p = r[0], g = r[r.length - 1];
       for (let m = 0; m < r.length - 1; m++)
         if (f >= r[m].value && f <= r[m + 1].value) {
-          p = r[m], b = r[m + 1];
+          p = r[m], g = r[m + 1];
           break;
         }
-      const g = (f - p.value) / (b.value - p.value || 1), w = n(p.color).map((m, s) => m * (1 - g) + n(b.color)[s] * g);
-      a.set(w, o * 4), a[o * 4 + 3] = 255;
+      const b = (f - p.value) / (g.value - p.value || 1), w = o(p.color).map((m, c) => m * (1 - b) + o(g.color)[c] * b);
+      a.set(w, n * 4), a[n * 4 + 3] = 255;
     }
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, t, 1, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, a), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
@@ -884,11 +884,11 @@ function s0(i, e) {
     "cm/hr": "cmhr",
     in: "in",
     inches: "in"
-  }, a = (n) => {
-    if (!n) return "";
-    const o = n.toLowerCase().trim();
-    return t[o] || o;
-  }, r = a(i), c = a(e), _ = `${r}_to_${c}`;
+  }, a = (o) => {
+    if (!o) return "";
+    const n = o.toLowerCase().trim();
+    return t[n] || n;
+  }, r = a(i), s = a(e), _ = `${r}_to_${s}`;
   return o0[_] || null;
 }
 const c0 = {
@@ -13106,20 +13106,20 @@ const c0 = {
   }
 };
 function $(i, e) {
-  const a = 245.305142, r = Math.PI / 180, c = 180 / Math.PI, _ = 53.91148 * r, n = i * r, o = e * r, f = Math.sin(o), p = Math.cos(o), b = Math.sin(n), g = Math.cos(n), w = Math.sin(_), m = Math.cos(_), s = m * f + w * p * g;
-  let A = Math.asin(s) * c;
-  const P = p * b, z = -w * f + m * p * g;
-  let S = Math.atan2(P, z) * c + a;
+  const a = 245.305142, r = Math.PI / 180, s = 180 / Math.PI, _ = 53.91148 * r, o = i * r, n = e * r, f = Math.sin(n), p = Math.cos(n), g = Math.sin(o), b = Math.cos(o), w = Math.sin(_), m = Math.cos(_), c = m * f + w * p * b;
+  let A = Math.asin(c) * s;
+  const P = p * g, z = -w * f + m * p * b;
+  let S = Math.atan2(P, z) * s + a;
   return S > 180 ? S -= 360 : S < -180 && (S += 360), [S, A];
 }
 function J(i, e) {
   const t = i == null ? void 0 : i[e];
   if (!t) return null;
-  const a = Object.keys(t).sort((r, c) => c.localeCompare(r));
+  const a = Object.keys(t).sort((r, s) => s.localeCompare(r));
   for (const r of a) {
-    const c = t[r];
-    if (!c) continue;
-    const _ = Object.keys(c).sort((n, o) => o.localeCompare(n));
+    const s = t[r];
+    if (!s) continue;
+    const _ = Object.keys(s).sort((o, n) => n.localeCompare(o));
     if (_.length > 0) return { date: r, run: _[0] };
   }
   return null;
@@ -13128,8 +13128,8 @@ class h0 extends i0 {
   constructor(e, t = {}) {
     if (super(), !e) throw new Error("A Mapbox GL map instance is required.");
     this.map = e, this.layers = /* @__PURE__ */ new Map(), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`, this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.dataCache = /* @__PURE__ */ new Map(), this.isPlaying = !1, this.playIntervalId = null, this.playbackSpeed = t.playbackSpeed || 500, this.customColormaps = t.customColormaps || {};
-    const a = t.layerOptions || {}, r = a.variable || "2t_2", { colormap: c, baseUnit: _ } = this._getColormapForVariable(r);
-    this.baseLayerOptions = { ...a, variable: r, colormap: c, colormapBaseUnit: _ }, this.state = { model: a.model || "gfs", variable: r, date: null, run: null, forecastHour: 0, visible: !0, opacity: a.opacity ?? 1, units: t.initialUnit || "imperial" }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
+    const a = t.layerOptions || {}, r = a.variable || "2t_2", { colormap: s, baseUnit: _ } = this._getColormapForVariable(r);
+    this.baseLayerOptions = { ...a, variable: r, colormap: s, colormapBaseUnit: _ }, this.state = { model: a.model || "gfs", variable: r, date: null, run: null, forecastHour: 0, visible: !0, opacity: a.opacity ?? 1, units: t.initialUnit || "imperial" }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
   }
   getAvailableVariables(e = null) {
     var a;
@@ -13141,10 +13141,10 @@ class h0 extends i0 {
     return (t == null ? void 0 : t.displayName) || (t == null ? void 0 : t.name) || e;
   }
   _handleWorkerMessage(e) {
-    const { success: t, requestId: a, decompressedData: r, encoding: c, error: _ } = e.data;
+    const { success: t, requestId: a, decompressedData: r, encoding: s, error: _ } = e.data;
     if (this.workerResolvers.has(a)) {
-      const { resolve: n, reject: o } = this.workerResolvers.get(a);
-      t ? n({ data: r, encoding: c }) : o(new Error(_)), this.workerResolvers.delete(a);
+      const { resolve: o, reject: n } = this.workerResolvers.get(a);
+      t ? o({ data: r, encoding: s }) : n(new Error(_)), this.workerResolvers.delete(a);
     }
   }
   play() {
@@ -13159,33 +13159,51 @@ class h0 extends i0 {
     this.isPlaying ? this.pause() : this.play();
   }
   step(e = 1) {
-    var p, b, g;
-    const { model: t, date: a, run: r, forecastHour: c } = this.state, _ = (g = (b = (p = this.modelStatus) == null ? void 0 : p[t]) == null ? void 0 : b[a]) == null ? void 0 : g[r];
+    var p, g, b;
+    const { model: t, date: a, run: r, forecastHour: s } = this.state, _ = (b = (g = (p = this.modelStatus) == null ? void 0 : p[t]) == null ? void 0 : g[a]) == null ? void 0 : b[r];
     if (!_ || _.length === 0) return;
-    const n = _.indexOf(c);
-    if (n === -1) return;
-    const o = _.length - 1;
-    let f = n + e;
-    f > o && (f = 0), f < 0 && (f = o), this.setState({ forecastHour: _[f] });
+    const o = _.indexOf(s);
+    if (o === -1) return;
+    const n = _.length - 1;
+    let f = o + e;
+    f > n && (f = 0), f < 0 && (f = n), this.setState({ forecastHour: _[f] });
   }
   setPlaybackSpeed(e) {
     e > 0 && (this.playbackSpeed = e, this.isPlaying && this.play());
   }
+  /**
+   * Lightweight update path for when only the forecast hour changes.
+   * This method fetches new grid data and updates the GPU texture without
+   * recalculating the underlying map geometry.
+   * @private
+   */
+  async _updateLayerData(e) {
+    const t = await this._loadGridData(e), a = this.layers.get(this.layerId);
+    if (t && t.data && a) {
+      const { shaderLayer: r } = a, s = this._getGridCornersAndDef(e.model).gridDef;
+      r.updateDataTexture(
+        t.data,
+        t.encoding,
+        s.grid_params.nx,
+        s.grid_params.ny
+      ), r.updateStyle({ opacity: this.state.opacity }), this.map.triggerRepaint();
+    }
+  }
   async setState(e) {
-    var g, w, m, s;
-    const t = e.model && e.model !== this.state.model, a = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), r = e.variable && e.variable !== this.state.variable;
-    Object.assign(this.state, e), (t || a || r) && (this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
-    const c = this.baseLayerOptions.colormap, _ = this.baseLayerOptions.colormapBaseUnit, n = this._getTargetUnit(_, this.state.units), o = this._convertColormapUnits(c, _, n), { model: f, date: p, run: b } = this.state;
+    var g, b, w, m;
+    const t = e.model && e.model !== this.state.model, a = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), r = e.variable && e.variable !== this.state.variable, _ = e.forecastHour !== void 0 && e.forecastHour !== this.state.forecastHour && !t && !a && !r;
+    ({ ...this.state }, Object.assign(this.state, e)), (t || a || r) && (this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
+    const o = this.baseLayerOptions.colormap, n = this.baseLayerOptions.colormapBaseUnit, f = this._getTargetUnit(n, this.state.units), p = this._convertColormapUnits(o, n, f);
     this.emit("state:change", {
+      /* ... all the state properties for the UI ... */
       ...this.state,
       availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
-      availableRuns: ((g = this.modelStatus) == null ? void 0 : g[f]) || {},
-      availableHours: ((s = (m = (w = this.modelStatus) == null ? void 0 : w[f]) == null ? void 0 : m[p]) == null ? void 0 : s[b]) || [],
-      availableVariables: this.getAvailableVariables(),
+      availableRuns: ((g = this.modelStatus) == null ? void 0 : g[this.state.model]) || {},
+      availableHours: ((m = (w = (b = this.modelStatus) == null ? void 0 : b[this.state.model]) == null ? void 0 : w[this.state.date]) == null ? void 0 : m[this.state.run]) || [],
       isPlaying: this.isPlaying,
-      colormap: o,
-      colormapBaseUnit: n
-    }), this._loadAndRenderGrid(this.state), (t || a || r) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
+      colormap: p,
+      colormapBaseUnit: f
+    }), _ ? await this._updateLayerData(this.state) : await this._loadAndRenderGrid(this.state), (t || a || r) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
   }
   async _loadAndRenderGrid(e) {
     const t = await this._loadGridData(e);
@@ -13219,16 +13237,16 @@ class h0 extends i0 {
     t && (a = { ...this.state, ...t, forecastHour: 0 }), await this.setState(a), (e.autoRefresh ?? this.autoRefreshEnabled) && this.startAutoRefresh(e.refreshInterval ?? this.autoRefreshIntervalSeconds);
   }
   _getColormapForVariable(e) {
-    var c, _;
+    var s, _;
     const t = this.customColormaps[e];
     if (t) {
       if (t.units) {
-        const n = this.state.units;
-        let o;
-        if (n === "imperial" && (o = "fahrenheit"), n === "metric" && (o = "celsius"), o && ((c = t.units[o]) != null && c.colormap))
+        const o = this.state.units;
+        let n;
+        if (o === "imperial" && (n = "fahrenheit"), o === "metric" && (n = "celsius"), n && ((s = t.units[n]) != null && s.colormap))
           return {
-            colormap: t.units[o].colormap,
-            baseUnit: o
+            colormap: t.units[n].colormap,
+            baseUnit: n
           };
       }
       if (t.colormap && t.baseUnit)
@@ -13239,10 +13257,10 @@ class h0 extends i0 {
     }
     const a = ((_ = q.variable_cmap) == null ? void 0 : _[e]) || e, r = _0[a];
     if (r) {
-      const n = Object.keys(r.units)[0];
+      const o = Object.keys(r.units)[0];
       return {
-        colormap: r.units[n].colormap,
-        baseUnit: n
+        colormap: r.units[o].colormap,
+        baseUnit: o
       };
     }
     return console.warn(`[Manager] No custom or default colormap found for variable "${e}". Using fallback.`), {
@@ -13254,10 +13272,10 @@ class h0 extends i0 {
     if (t === a) return e;
     const r = s0(t, a);
     if (!r) return e;
-    const c = [];
+    const s = [];
     for (let _ = 0; _ < e.length; _ += 2)
-      c.push(r(e[_]), e[_ + 1]);
-    return c;
+      s.push(r(e[_]), e[_ + 1]);
+    return s;
   }
   /**
    * NEW: Replaces the old corner calculation with the more robust logic from your code.
@@ -13266,40 +13284,40 @@ class h0 extends i0 {
   _getGridCornersAndDef(e) {
     const t = { ...n0[e], modelName: e };
     if (!t) return null;
-    const { nx: a, ny: r } = t.grid_params, c = t.type;
+    const { nx: a, ny: r } = t.grid_params, s = t.type;
     let _;
-    if (c === "latlon") {
-      let { lon_first: n, lat_first: o, lat_last: f, lon_last: p, dx_degrees: b, dy_degrees: g } = t.grid_params;
+    if (s === "latlon") {
+      let { lon_first: o, lat_first: n, lat_last: f, lon_last: p, dx_degrees: g, dy_degrees: b } = t.grid_params;
       _ = {
-        lon_tl: n,
-        lat_tl: o,
-        lon_tr: p !== void 0 ? p : n + (a - 1) * b,
-        lat_tr: o,
-        lon_bl: n,
-        lat_bl: f !== void 0 ? f : o + (r - 1) * g,
-        lon_br: p !== void 0 ? p : n + (a - 1) * b,
-        lat_br: f !== void 0 ? f : o + (r - 1) * g
+        lon_tl: o,
+        lat_tl: n,
+        lon_tr: p !== void 0 ? p : o + (a - 1) * g,
+        lat_tr: n,
+        lon_bl: o,
+        lat_bl: f !== void 0 ? f : n + (r - 1) * b,
+        lon_br: p !== void 0 ? p : o + (a - 1) * g,
+        lat_br: f !== void 0 ? f : n + (r - 1) * b
       };
-    } else if (c === "rotated_latlon") {
-      const [n, o] = $(t.grid_params.lon_first, t.grid_params.lat_first), [f, p] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first), [b, g] = $(t.grid_params.lon_first, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees), [w, m] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees);
-      _ = { lon_tl: n, lat_tl: o, lon_tr: f, lat_tr: p, lon_bl: b, lat_bl: g, lon_br: w, lat_br: m };
-    } else if (c === "lambert_conformal_conic" || c === "polar_stereographic") {
-      let n = Object.entries(t.proj_params).map(([C, v]) => `+${C}=${v}`).join(" ");
-      c === "polar_stereographic" && (n += " +lat_0=90");
-      const { x_origin: o, y_origin: f, dx: p, dy: b } = t.grid_params, [g, w] = j(n, "EPSG:4326", [o, f]), [m, s] = j(n, "EPSG:4326", [o + (a - 1) * p, f]), [A, P] = j(n, "EPSG:4326", [o, f + (r - 1) * b]), [z, S] = j(n, "EPSG:4326", [o + (a - 1) * p, f + (r - 1) * b]);
-      _ = { lon_tl: g, lat_tl: w, lon_tr: m, lat_tr: s, lon_bl: A, lat_bl: P, lon_br: z, lat_br: S };
+    } else if (s === "rotated_latlon") {
+      const [o, n] = $(t.grid_params.lon_first, t.grid_params.lat_first), [f, p] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first), [g, b] = $(t.grid_params.lon_first, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees), [w, m] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees);
+      _ = { lon_tl: o, lat_tl: n, lon_tr: f, lat_tr: p, lon_bl: g, lat_bl: b, lon_br: w, lat_br: m };
+    } else if (s === "lambert_conformal_conic" || s === "polar_stereographic") {
+      let o = Object.entries(t.proj_params).map(([C, v]) => `+${C}=${v}`).join(" ");
+      s === "polar_stereographic" && (o += " +lat_0=90");
+      const { x_origin: n, y_origin: f, dx: p, dy: g } = t.grid_params, [b, w] = j(o, "EPSG:4326", [n, f]), [m, c] = j(o, "EPSG:4326", [n + (a - 1) * p, f]), [A, P] = j(o, "EPSG:4326", [n, f + (r - 1) * g]), [z, S] = j(o, "EPSG:4326", [n + (a - 1) * p, f + (r - 1) * g]);
+      _ = { lon_tl: b, lat_tl: w, lon_tr: m, lat_tr: c, lon_bl: A, lat_bl: P, lon_br: z, lat_br: S };
     } else
       return null;
     return { corners: _, gridDef: t };
   }
   _updateOrCreateLayer(e, t, a, r) {
-    const { model: c, colormap: _, opacity: n = 1, visible: o = !0, units: f, variable: p } = t, b = this._getGridCornersAndDef(c);
-    if (!b) {
-      console.error(`Could not generate geometry for model: ${c}`);
+    const { model: s, colormap: _, opacity: o = 1, visible: n = !0, units: f, variable: p } = t, g = this._getGridCornersAndDef(s);
+    if (!g) {
+      console.error(`Could not generate geometry for model: ${s}`);
       return;
     }
-    const { corners: g, gridDef: w } = b, m = t.colormapBaseUnit, s = q.fld[p] || {}, A = this._getTargetUnit(m, f), P = this._convertColormapUnits(_, m, A), z = [P[0], P[P.length - 2]], S = s.defaultUnit || "none", C = this.layers.has(e), v = C ? this.layers.get(e).shaderLayer : new r0(e);
-    C || (this.map.addLayer(v, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: v, options: t, visible: o })), v.updateGeometry(g, w), v.updateDataTexture(a, r, w.grid_params.nx, w.grid_params.ny), v.updateColormapTexture(P), v.updateStyle({ opacity: o ? n : 0, dataRange: z }), v.setUnitConversion(S, f), this.map.triggerRepaint();
+    const { corners: b, gridDef: w } = g, m = t.colormapBaseUnit, c = q.fld[p] || {}, A = this._getTargetUnit(m, f), P = this._convertColormapUnits(_, m, A), z = [P[0], P[P.length - 2]], S = c.defaultUnit || "none", C = this.layers.has(e), v = C ? this.layers.get(e).shaderLayer : new r0(e);
+    C || (this.map.addLayer(v, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: v, options: t, visible: n })), v.updateGeometry(b, w), v.updateDataTexture(a, r, w.grid_params.nx, w.grid_params.ny), v.updateColormapTexture(P), v.updateStyle({ opacity: n ? o : 0, dataRange: z }), v.setUnitConversion(S, f), this.map.triggerRepaint();
   }
   _getTargetUnit(e, t) {
     if (t === "metric") {
@@ -13344,14 +13362,14 @@ class h0 extends i0 {
     return new Worker(URL.createObjectURL(t), { type: "module" });
   }
   async _preloadCurrentRun() {
-    var _, n, o;
-    const { model: e, date: t, run: a } = this.state, r = (o = (n = (_ = this.modelStatus) == null ? void 0 : _[e]) == null ? void 0 : n[t]) == null ? void 0 : o[a];
+    var _, o, n;
+    const { model: e, date: t, run: a } = this.state, r = (n = (o = (_ = this.modelStatus) == null ? void 0 : _[e]) == null ? void 0 : o[t]) == null ? void 0 : n[a];
     if (!r || r.length === 0) return;
-    const c = r.map((f) => {
+    const s = r.map((f) => {
       const p = { ...this.state, forecastHour: f };
       return this._loadGridData(p);
     });
-    await Promise.all(c);
+    await Promise.all(s);
   }
   async fetchModelStatus(e = !1) {
     if (!this.modelStatus || e)
@@ -13375,21 +13393,21 @@ class h0 extends i0 {
     this.autoRefreshIntervalId && (clearInterval(this.autoRefreshIntervalId), this.autoRefreshIntervalId = null);
   }
   async _loadGridData(e) {
-    const { model: t, date: a, run: r, forecastHour: c, variable: _, smoothing: n = 0 } = { ...this.baseLayerOptions, ...e }, o = `${t}-${a}-${r}-${c}-${_}-${n || ""}`;
-    if (this.dataCache.has(o))
-      return this.dataCache.get(o);
-    const f = new Promise(async (p, b) => {
-      const g = `${this.baseUrl}/${t}/${a}/${r}/${c}/${_}/${n}`;
+    const { model: t, date: a, run: r, forecastHour: s, variable: _, smoothing: o = 0 } = { ...this.baseLayerOptions, ...e }, n = `${t}-${a}-${r}-${s}-${_}-${o || ""}`;
+    if (this.dataCache.has(n))
+      return this.dataCache.get(n);
+    const f = new Promise(async (p, g) => {
+      const b = `${this.baseUrl}/${t}/${a}/${r}/${s}/${_}/${o}`;
       try {
-        const w = await fetch(g);
-        if (!w.ok) throw new Error(`HTTP ${w.status} for ${g}`);
-        const { data: m, encoding: s } = await w.json(), A = Uint8Array.from(atob(m), (z) => z.charCodeAt(0)), P = this.workerRequestId++;
-        this.workerResolvers.set(P, { resolve: p, reject: b }), this.worker.postMessage({ requestId: P, compressedData: A, encoding: s }, [A.buffer]);
+        const w = await fetch(b);
+        if (!w.ok) throw new Error(`HTTP ${w.status} for ${b}`);
+        const { data: m, encoding: c } = await w.json(), A = Uint8Array.from(atob(m), (z) => z.charCodeAt(0)), P = this.workerRequestId++;
+        this.workerResolvers.set(P, { resolve: p, reject: g }), this.worker.postMessage({ requestId: P, compressedData: A, encoding: c }, [A.buffer]);
       } catch (w) {
-        b(w);
+        g(w);
       }
-    }).then((p) => (this.dataCache.set(o, p), p)).catch((p) => (this.dataCache.delete(o), null));
-    return this.dataCache.set(o, f), f;
+    }).then((p) => (this.dataCache.set(n, p), p)).catch((p) => (this.dataCache.delete(n), null));
+    return this.dataCache.set(n, f), f;
   }
   removeLayer(e) {
     this.layers.has(e) && (this.map.getLayer(e) && this.map.removeLayer(e), this.layers.delete(e));
@@ -13522,27 +13540,27 @@ const l0 = {
   // Assuming point label for natural features
   subdivisionLabels: { layerId: "AML_-_subdivision-label" }
 };
-function D(i) {
+function W(i) {
   return typeof i == "string" && i.startsWith("#") && i.length === 9 ? i.substring(0, 7) : i;
 }
-const N = (i, e, t) => {
-  if (i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "line-color", D(t.color)), i.setPaintProperty(e, "line-width", t.width), t.lineType)) {
+const V = (i, e, t) => {
+  if (i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "line-color", W(t.color)), i.setPaintProperty(e, "line-width", t.width), t.lineType)) {
     const a = { dashed: [2, 2], dotted: [0, 2], solid: [] };
     i.setPaintProperty(e, "line-dasharray", a[t.lineType] || []);
   }
 }, B = (i, e, t) => {
-  i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "text-color", D(t.color)), i.setPaintProperty(e, "text-halo-color", D(t.outlineColor)), i.setPaintProperty(e, "text-halo-width", t.outlineWidth), i.setLayoutProperty(e, "text-size", t.fontSize), i.setLayoutProperty(e, "text-font", [t.fontFamily]));
+  i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "text-color", W(t.color)), i.setPaintProperty(e, "text-halo-color", W(t.outlineColor)), i.setPaintProperty(e, "text-halo-width", t.outlineWidth), i.setLayoutProperty(e, "text-size", t.fontSize), i.setLayoutProperty(e, "text-font", [t.fontFamily]));
 };
 function e0(i, e, t, a) {
-  a && i.getLayer(e) && (a.color && i.setPaintProperty(e, t, D(a.color)), a.visible !== void 0 && i.setLayoutProperty(e, "visibility", a.visible ? "visible" : "none"));
+  a && i.getLayer(e) && (a.color && i.setPaintProperty(e, t, W(a.color)), a.visible !== void 0 && i.setLayoutProperty(e, "visibility", a.visible ? "visible" : "none"));
 }
 function t0(i, e) {
   if (!(!i || !i.isStyleLoaded())) {
     if (e.landOcean) {
-      const { landColor: t, oceanColor: a, waterDepth: r, nationalPark: c } = e.landOcean;
-      i.getLayer(L.landColor.layerId) && i.setPaintProperty(L.landColor.layerId, "background-color", D(t)), i.getLayer(L.oceanColor.layerId) && i.setPaintProperty(L.oceanColor.layerId, "fill-color", D(a)), e0(i, L.waterDepth.layerId, "fill-color", r), e0(i, L.nationalPark.layerId, "fill-color", c);
+      const { landColor: t, oceanColor: a, waterDepth: r, nationalPark: s } = e.landOcean;
+      i.getLayer(L.landColor.layerId) && i.setPaintProperty(L.landColor.layerId, "background-color", W(t)), i.getLayer(L.oceanColor.layerId) && i.setPaintProperty(L.oceanColor.layerId, "fill-color", W(a)), e0(i, L.waterDepth.layerId, "fill-color", r), e0(i, L.nationalPark.layerId, "fill-color", s);
     }
-    e.transportation && (N(i, L.roads.layerId, e.transportation.roads), N(i, L.airports.layerId, e.transportation.airports)), e.boundaries && (N(i, L.countries.layerId, e.boundaries.countries), N(i, L.states.layerId, e.boundaries.states), N(i, L.counties.layerId, e.boundaries.counties)), e.waterFeatures && N(i, L.waterways.layerId, e.waterFeatures.waterways), e.labels && (B(i, L.continents.layerId, e.labels.continents), B(i, L.countriesLabels.layerId, e.labels.countries), B(i, L.statesLabels.layerId, e.labels.states), B(i, L.citiesMajor.layerId, e.labels.cities.major), B(i, L.citiesMinor.layerId, e.labels.cities.minor), B(i, L.airportsLabels.layerId, e.labels.airports), B(i, L.poi.layerId, e.labels.poi), B(i, L.waterLabels.layerId, e.labels.waterLabels), B(i, L.naturalLabels.layerId, e.labels.naturalLabels), B(i, L.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && i.getSource("mapbox-dem") && (e.terrain.visible ? (i.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), i.getLayer("hillshade") && (i.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), i.setPaintProperty("hillshade", "hillshade-shadow-color", D(e.terrain.shadowColor)), i.setPaintProperty("hillshade", "hillshade-highlight-color", D(e.terrain.highlightColor)), i.setPaintProperty("hillshade", "hillshade-accent-color", D(e.terrain.accentColor)))) : i.setTerrain(null));
+    e.transportation && (V(i, L.roads.layerId, e.transportation.roads), V(i, L.airports.layerId, e.transportation.airports)), e.boundaries && (V(i, L.countries.layerId, e.boundaries.countries), V(i, L.states.layerId, e.boundaries.states), V(i, L.counties.layerId, e.boundaries.counties)), e.waterFeatures && V(i, L.waterways.layerId, e.waterFeatures.waterways), e.labels && (B(i, L.continents.layerId, e.labels.continents), B(i, L.countriesLabels.layerId, e.labels.countries), B(i, L.statesLabels.layerId, e.labels.states), B(i, L.citiesMajor.layerId, e.labels.cities.major), B(i, L.citiesMinor.layerId, e.labels.cities.minor), B(i, L.airportsLabels.layerId, e.labels.airports), B(i, L.poi.layerId, e.labels.poi), B(i, L.waterLabels.layerId, e.labels.waterLabels), B(i, L.naturalLabels.layerId, e.labels.naturalLabels), B(i, L.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && i.getSource("mapbox-dem") && (e.terrain.visible ? (i.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), i.getLayer("hillshade") && (i.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), i.setPaintProperty("hillshade", "hillshade-shadow-color", W(e.terrain.shadowColor)), i.setPaintProperty("hillshade", "hillshade-highlight-color", W(e.terrain.highlightColor)), i.setPaintProperty("hillshade", "hillshade-accent-color", W(e.terrain.accentColor)))) : i.setTerrain(null));
   }
 }
 function Z(i, e) {
@@ -13565,15 +13583,15 @@ class u0 extends i0 {
       light: a,
       dark: r
     };
-    const c = t.defaultTheme || "light";
-    this.currentCustomizations = this.themes[c], this.currentThemeName = c, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
+    const s = t.defaultTheme || "light";
+    this.currentCustomizations = this.themes[s], this.currentThemeName = s, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
       container: e,
       style: p0,
       center: [-98, 39],
       zoom: 3.5,
       ...t.mapOptions
     }), this.map.on("load", () => {
-      console.log("[MapManager] Map loaded. Applying initial theme:", c), t0(this.map, this.currentCustomizations), this.emit("style:applied", {
+      console.log("[MapManager] Map loaded. Applying initial theme:", s), t0(this.map, this.currentCustomizations), this.emit("style:applied", {
         themeName: this.currentThemeName,
         styles: this.currentCustomizations
       });
@@ -13581,17 +13599,17 @@ class u0 extends i0 {
   }
   // The rest of the methods (setTheme, setLabelGroupVisibility, etc.) are correct and remain unchanged...
   setTheme(e) {
-    var r, c, _;
+    var r, s, _;
     if (!this.themes[e]) {
       console.error(`[MapManager] Theme "${e}" does not exist.`);
       return;
     }
     const t = JSON.parse(JSON.stringify(this.themes[e])), a = this.currentCustomizations.labels;
     if (a)
-      for (const n in a) {
-        (r = a[n]) != null && r.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = a[n].visible);
-        for (const o in a[n])
-          (c = a[n][o]) != null && c.hasOwnProperty("visible") && ((_ = t.labels[n]) != null && _[o]) && (t.labels[n][o].visible = a[n][o].visible);
+      for (const o in a) {
+        (r = a[o]) != null && r.hasOwnProperty("visible") && t.labels[o] && (t.labels[o].visible = a[o].visible);
+        for (const n in a[o])
+          (s = a[o][n]) != null && s.hasOwnProperty("visible") && ((_ = t.labels[o]) != null && _[n]) && (t.labels[o][n].visible = a[o][n].visible);
       }
     this.currentCustomizations = t, this.currentThemeName = e, t0(this.map, this.currentCustomizations), this.emit("style:applied", {
       themeName: this.currentThemeName,
@@ -13599,18 +13617,18 @@ class u0 extends i0 {
     });
   }
   setLabelGroupVisibility(e, t) {
-    var o;
+    var n;
     const a = `labels.${e}.visible`;
     let r = this.currentCustomizations;
-    const c = a.split(".");
-    for (let f = 0; f < c.length - 1; f++)
-      if (r = r[c[f]], !r) {
+    const s = a.split(".");
+    for (let f = 0; f < s.length - 1; f++)
+      if (r = r[s[f]], !r) {
         console.error(`Invalid label group key: ${e}`);
         return;
       }
-    r[c[c.length - 1]] = t;
-    const _ = e.replace(/\.(.)/g, (f, p) => p.toUpperCase()), n = (o = L[_]) == null ? void 0 : o.layerId;
-    n && this.map.getLayer(n) ? (this.map.setLayoutProperty(n, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${n} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${_})`);
+    r[s[s.length - 1]] = t;
+    const _ = e.replace(/\.(.)/g, (f, p) => p.toUpperCase()), o = (n = L[_]) == null ? void 0 : n.layerId;
+    o && this.map.getLayer(o) ? (this.map.setLayoutProperty(o, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${o} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${_})`);
   }
   addWeatherManager(e) {
     this.weatherLayerManagers.set(e.layerId, e);
