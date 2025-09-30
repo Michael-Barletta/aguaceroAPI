@@ -53,20 +53,24 @@ export class FillLayerManager extends EventEmitter {
         this.worker.addEventListener('message', this._handleWorkerMessage.bind(this));
         this.statusUrl = 'https://d3dc62msmxkrd7.cloudfront.net/model-status';
         this.modelStatus = null;
-        this.loadStrategy = options.loadStrategy || 'preload';
+        this.mrmsStatus = null; // ADD THIS
+        this.loadStrategy = options.loadStrategy || 'on-demand';
         this.dataCache = new Map();
         this.isPlaying = false;
         this.playIntervalId = null;
         this.playbackSpeed = options.playbackSpeed || 500;
         this.customColormaps = options.customColormaps || {};
+        
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || null;
+        
         let colormap, baseUnit;
         if (initialVariable) {
             const colormapData = this._getColormapForVariable(initialVariable);
             colormap = colormapData.colormap;
             baseUnit = colormapData.baseUnit;
         }
+        
         this.baseLayerOptions = { 
             ...userLayerOptions, 
             variable: initialVariable, 
@@ -75,7 +79,9 @@ export class FillLayerManager extends EventEmitter {
         };
         
         this.state = { 
-            model: userLayerOptions.model || 'gfs', 
+            model: userLayerOptions.model || 'gfs',
+            isMRMS: false, // ADD THIS
+            mrmsTimestamp: null, // ADD THIS
             variable: initialVariable, 
             date: null, 
             run: null, 
@@ -162,17 +168,22 @@ export class FillLayerManager extends EventEmitter {
      * @private
      */
     async _updateLayerData(state) {
-        // Don't load anything if no variable is selected
-        if (!state.variable) {
-            return;
-        }
+        const startTime = performance.now();
+        console.log('[_updateLayerData] START (fallback path)');
+
+        if (!state.variable) return;
         
+        const loadStart = performance.now();
         const grid = await this._loadGridData(state);
+        console.log('[_updateLayerData] Load grid data took:', (performance.now() - loadStart).toFixed(2), 'ms');
+
         const layer = this.layers.get(this.layerId);
 
         if (grid && grid.data && layer) {
+            const updateStart = performance.now();
             const { shaderLayer } = layer;
-            const gridDef = this._getGridCornersAndDef(state.model).gridDef;
+            const gridModel = state.isMRMS ? 'mrms' : state.model;
+            const gridDef = this._getGridCornersAndDef(gridModel).gridDef;
 
             shaderLayer.updateDataTexture(
                 grid.data, 
@@ -183,7 +194,10 @@ export class FillLayerManager extends EventEmitter {
             
             shaderLayer.updateStyle({ opacity: this.state.opacity });
             this.map.triggerRepaint();
+            console.log('[_updateLayerData] Update operations took:', (performance.now() - updateStart).toFixed(2), 'ms');
         }
+
+        console.log('[_updateLayerData] COMPLETE - Total time:', (performance.now() - startTime).toFixed(2), 'ms');
     }
 
     async setOpacity(newOpacity) {
@@ -194,19 +208,42 @@ export class FillLayerManager extends EventEmitter {
         
         await this.setState({ opacity: clampedOpacity });
     }
-
     async setState(newState) {
+        const startTime = performance.now();
+        console.log('[setState] START', { 
+            newState, 
+            currentState: this.state 
+        });
+
         const modelChanged = newState.model && newState.model !== this.state.model;
         const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
         const variableChanged = newState.variable !== undefined && newState.variable !== this.state.variable;
         const hourChanged = newState.forecastHour !== undefined && newState.forecastHour !== this.state.forecastHour;
+        const mrmsTimestampChanged = newState.mrmsTimestamp !== undefined && newState.mrmsTimestamp !== this.state.mrmsTimestamp;
+        const modeChanged = newState.isMRMS !== undefined && newState.isMRMS !== this.state.isMRMS;
 
-        const isOnlyTimeChange = hourChanged && !modelChanged && !runChanged && !variableChanged;
+        console.log('[setState] Change detection:', {
+            modelChanged,
+            runChanged,
+            variableChanged,
+            hourChanged,
+            mrmsTimestampChanged,
+            modeChanged
+        });
+
+        const shouldClearCache = variableChanged || (modeChanged && newState.variable !== null);
+        const isOnlyTimeChange = (hourChanged || mrmsTimestampChanged) && !modelChanged && !runChanged && !variableChanged && !modeChanged;
+
+        console.log('[setState] Optimization flags:', {
+            shouldClearCache,
+            isOnlyTimeChange
+        });
 
         const previousState = { ...this.state };
         Object.assign(this.state, newState);
 
-        if (modelChanged || runChanged || variableChanged) {
+        if (shouldClearCache) {
+            console.log('[setState] Clearing cache and hiding layer');
             if (this.layers.has(this.layerId)) {
                 this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 });
                 this.map.triggerRepaint();
@@ -214,7 +251,7 @@ export class FillLayerManager extends EventEmitter {
             this.dataCache.clear();
         }
 
-        // Handle colormap display
+        const colormapStart = performance.now();
         let displayColormap = [];
         let toUnit = '';
         
@@ -224,27 +261,123 @@ export class FillLayerManager extends EventEmitter {
             toUnit = this._getTargetUnit(fromUnit, this.state.units);
             displayColormap = this._convertColormapUnits(baseColormap, fromUnit, toUnit);
         }
+        console.log('[setState] Colormap processing took:', (performance.now() - colormapStart).toFixed(2), 'ms');
 
+        let availableTimestamps = [];
+        if (this.state.isMRMS && this.state.variable && this.mrmsStatus) {
+            const timestamps = this.mrmsStatus[this.state.variable] || [];
+            availableTimestamps = [...timestamps].reverse();
+        }
+
+        const emitStart = performance.now();
         this.emit('state:change', {
             ...this.state,
             availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
             availableRuns: this.modelStatus?.[this.state.model] || {},
-            availableHours: this.modelStatus?.[this.state.model]?.[this.state.date]?.[this.state.run] || [],
-            availableVariables: this.getAvailableVariables(this.state.model),
+            availableHours: this.state.isMRMS ? [] : (this.modelStatus?.[this.state.model]?.[this.state.date]?.[this.state.run] || []),
+            availableVariables: this.getAvailableVariables(this.state.isMRMS ? 'mrms' : this.state.model),
+            availableTimestamps: availableTimestamps,
             isPlaying: this.isPlaying,
             colormap: displayColormap,
             colormapBaseUnit: toUnit,
         });
+        console.log('[setState] Event emission took:', (performance.now() - emitStart).toFixed(2), 'ms');
 
+        const renderStart = performance.now();
         if (isOnlyTimeChange) {
-            await this._updateLayerData(this.state);
-        } else {
+            console.log('[setState] Using FAST PATH for time-only change');
+            await this._updateLayerDataFast(this.state);
+        } else if (shouldClearCache || !this.layers.has(this.layerId)) {
+            console.log('[setState] Using FULL PATH for layer recreation');
             await this._loadAndRenderGrid(this.state);
         }
+        console.log('[setState] Render path took:', (performance.now() - renderStart).toFixed(2), 'ms');
         
-        if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload' && this.state.variable) {
-            setTimeout(() => this._preloadCurrentRun(), 0);
+        if (shouldClearCache && this.loadStrategy === 'preload' && this.state.variable) {
+            console.log('[setState] Triggering preload in background');
+            if (this.state.isMRMS) {
+                setTimeout(() => this._preloadMRMSVariable(), 0);
+            } else {
+                setTimeout(() => this._preloadCurrentRun(), 0);
+            }
         }
+
+        console.log('[setState] COMPLETE - Total time:', (performance.now() - startTime).toFixed(2), 'ms');
+    }
+
+    async _updateLayerDataFast(state) {
+        const startTime = performance.now();
+        console.log('[_updateLayerDataFast] START', { state });
+
+        if (!state.variable) {
+            console.log('[_updateLayerDataFast] No variable selected, exiting');
+            return;
+        }
+        
+        const layer = this.layers.get(this.layerId);
+        if (!layer) {
+            console.log('[_updateLayerDataFast] No layer found, exiting');
+            return;
+        }
+
+        const keyStart = performance.now();
+        const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = state;
+        let dataUrlIdentifier;
+        
+        if (isMRMS) {
+            if (!mrmsTimestamp) {
+                console.log('[_updateLayerDataFast] No MRMS timestamp, exiting');
+                return;
+            }
+            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${smoothing || ''}`;
+        } else {
+            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
+        }
+        console.log('[_updateLayerDataFast] Cache key:', dataUrlIdentifier);
+        console.log('[_updateLayerDataFast] Key generation took:', (performance.now() - keyStart).toFixed(2), 'ms');
+
+        const cacheCheckStart = performance.now();
+        const cachedData = this.dataCache.get(dataUrlIdentifier);
+        console.log('[_updateLayerDataFast] Cache check took:', (performance.now() - cacheCheckStart).toFixed(2), 'ms');
+        
+        if (!cachedData) {
+            console.warn('[_updateLayerDataFast] ⚠️ Data NOT in cache! Falling back to full load');
+            console.log('[_updateLayerDataFast] Current cache keys:', Array.from(this.dataCache.keys()));
+            await this._updateLayerData(state);
+            return;
+        }
+
+        console.log('[_updateLayerDataFast] ✓ Data found in cache');
+        
+        const awaitStart = performance.now();
+        const grid = await cachedData;
+        console.log('[_updateLayerDataFast] Await cached data took:', (performance.now() - awaitStart).toFixed(2), 'ms');
+        
+        if (grid && grid.data) {
+            const textureStart = performance.now();
+            const { shaderLayer } = layer;
+            const gridModel = state.isMRMS ? 'mrms' : state.model;
+            const gridDef = this._getGridCornersAndDef(gridModel).gridDef;
+
+            console.log('[_updateLayerDataFast] Grid data size:', grid.data.length, 'bytes');
+            console.log('[_updateLayerDataFast] Grid dimensions:', gridDef.grid_params.nx, 'x', gridDef.grid_params.ny);
+
+            shaderLayer.updateDataTexture(
+                grid.data, 
+                grid.encoding, 
+                gridDef.grid_params.nx, 
+                gridDef.grid_params.ny
+            );
+            console.log('[_updateLayerDataFast] Texture update took:', (performance.now() - textureStart).toFixed(2), 'ms');
+            
+            const repaintStart = performance.now();
+            this.map.triggerRepaint();
+            console.log('[_updateLayerDataFast] Trigger repaint took:', (performance.now() - repaintStart).toFixed(2), 'ms');
+        } else {
+            console.error('[_updateLayerDataFast] ❌ Grid data is null or missing');
+        }
+
+        console.log('[_updateLayerDataFast] COMPLETE - Total time:', (performance.now() - startTime).toFixed(2), 'ms');
     }
 
     async _loadAndRenderGrid(state) {
@@ -263,14 +396,15 @@ export class FillLayerManager extends EventEmitter {
         }
     }
         
-    async setVariable(newVariable) {
-        if (newVariable === this.state.variable) return;
-        const { colormap, baseUnit } = this._getColormapForVariable(newVariable);
-        this.baseLayerOptions.variable = newVariable;
-        this.baseLayerOptions.colormap = colormap;
-        this.baseLayerOptions.colormapBaseUnit = baseUnit;
-        await this.setState({ variable: newVariable, forecastHour: 0 });
+    setVariable(variable) {
+        const { colormap, baseUnit } = this._getColormapForVariable(variable);
+        this.setState({ 
+            variable,
+            colormap: colormap,
+            colormapBaseUnit: baseUnit
+        });
     }
+
     
     async setModel(modelName) {
         if (modelName === this.state.model) return;
@@ -295,9 +429,11 @@ export class FillLayerManager extends EventEmitter {
 
     async initialize(options = {}) {
         await this.fetchModelStatus(true);
+        await this.fetchMRMSStatus(true); // ADD THIS
+        
         const latestRun = findLatestModelRun(this.modelStatus, this.state.model);
         let initialState = this.state;
-        if (latestRun) {
+        if (latestRun && !this.state.isMRMS) {
             initialState = { ...this.state, ...latestRun, forecastHour: 0 };
         }
         await this.setState(initialState);
@@ -306,44 +442,29 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-    _getColormapForVariable(variableName) {
-        const customMap = this.customColormaps[variableName];
-        if (customMap) {
-            if (customMap.units) {
-                const currentSystem = this.state.units;
-                let targetUnitKey;
-                if (currentSystem === 'imperial') targetUnitKey = 'fahrenheit';
-                if (currentSystem === 'metric') targetUnitKey = 'celsius';
-                if (targetUnitKey && customMap.units[targetUnitKey]?.colormap) {
-                    return {
-                        colormap: customMap.units[targetUnitKey].colormap,
-                        baseUnit: targetUnitKey
-                    };
-                }
-            }
-            if (customMap.colormap && customMap.baseUnit) {
-                return {
-                    colormap: customMap.colormap,
-                    baseUnit: customMap.baseUnit
-                };
-            }
+    _getColormapForVariable(variable) {
+        // Default the key to the variable name itself.
+        let colormapKey = variable;
+
+        // Check if an alias exists in our static mapping.
+        if (DICTIONARIES.variable_cmap[variable]) {
+            colormapKey = DICTIONARIES.variable_cmap[variable];
+            console.log(`[DEBUG] _getColormap: Mapped "${variable}" to colormap key "${colormapKey}".`);
         }
 
-        const cmapKey = DICTIONARIES.variable_cmap?.[variableName] || variableName;
-        const defaultColormapSet = DEFAULT_COLORMAPS[cmapKey];
-        if (defaultColormapSet) {
-            const baseUnit = Object.keys(defaultColormapSet.units)[0];
+        // Use the final key to look up the colormap data.
+        const colormapData = this.customColormaps[colormapKey];
+
+        if (colormapData && colormapData.colormap) {
             return {
-                colormap: defaultColormapSet.units[baseUnit].colormap,
-                baseUnit: baseUnit
+                colormap: colormapData.colormap,
+                baseUnit: colormapData.baseUnit || ''
             };
         }
 
-        console.warn(`[Manager] No custom or default colormap found for variable "${variableName}". Using fallback.`);
-        return {
-            colormap: [0, '#000000', 1, '#ffffff'],
-            baseUnit: 'unknown'
-        };
+        // Return a safe, empty default if no colormap is found to prevent crashes.
+        console.warn(`[DEBUG] _getColormap: Colormap NOT found for variable "${variable}" (resolved key: "${colormapKey}").`);
+        return { colormap: [], baseUnit: '' };
     }
 
     _convertColormapUnits(colormap, fromUnits, toUnits) {
@@ -403,11 +524,16 @@ export class FillLayerManager extends EventEmitter {
     }
 
     _updateOrCreateLayer(id, options, decompressedData, encoding) {
-        const { model, colormap, opacity = 1, visible = true, units, variable } = options;
+        // In the original code, this line was: const { model, ... } = options;
+        // We adjust it to explicitly get isMRMS as well.
+        const { model, colormap, opacity = 1, visible = true, units, variable, isMRMS } = options;
         
-        const geometry = this._getGridCornersAndDef(model);
+        // ADD THIS LINE: Determine the correct model to use for the geometry lookup.
+        const gridModel = isMRMS ? 'mrms' : model;
+        // EDIT THIS LINE: Use the new gridModel variable.
+        const geometry = this._getGridCornersAndDef(gridModel);
         if (!geometry) {
-            console.error(`Could not generate geometry for model: ${model}`);
+            console.error(`Could not generate geometry for model: ${gridModel}`);
             return;
         }
         const { corners, gridDef } = geometry;
@@ -511,6 +637,81 @@ export class FillLayerManager extends EventEmitter {
         return this.modelStatus;
     }
 
+    async fetchMRMSStatus(force = false) {
+        const mrmsStatusUrl = 'https://h3dfvh5pq6euq36ymlpz4zqiha0obqju.lambda-url.us-east-2.on.aws';
+        
+        if (!this.mrmsStatus || force) {
+            try {
+                const response = await fetch(mrmsStatusUrl);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const statusData = await response.json();
+                this.mrmsStatus = statusData;
+            } catch (error) {
+                console.error('[FillLayerManager] Failed to fetch MRMS status:', error);
+                this.mrmsStatus = null;
+            }
+        }
+        return this.mrmsStatus;
+    }
+
+    /**
+     * Sets the active MRMS variable, prepares the state, and triggers preloading.
+     * Includes detailed logging for debugging.
+     *
+     * @param {string} variable - The MRMS variable code.
+     */
+    async setMRMSVariable(variable) {
+        const sortedTimestamps = [...(this.mrmsStatus[variable] || [])].sort((a, b) => a - b);
+        const initialTimestamp = sortedTimestamps.length > 0 ? sortedTimestamps[sortedTimestamps.length - 1] : null;
+
+        // Use the new helper to get colormap info.
+        const { colormap, baseUnit } = this._getColormapForVariable(variable);
+
+        const newState = {
+            variable,
+            isMRMS: true,
+            mrmsTimestamp: initialTimestamp,
+            availableTimestamps: sortedTimestamps,
+            colormap: colormap,
+            colormapBaseUnit: baseUnit,
+        };
+        
+        console.log('[DEBUG] setMRMSVariable: Setting new state:', newState);
+        this.setState(newState);
+
+        await this._preloadMRMSVariable();
+    }
+
+    /**
+     * Preloads all grid data for the currently selected MRMS variable.
+     * Includes logging to confirm execution.
+     */
+    async _preloadMRMSVariable() {
+        const { variable } = this.state;
+        if (!this.mrmsStatus || !variable) {
+            console.log('[DEBUG] _preloadMRMSVariable: Aborting, no variable selected.');
+            return;
+        }
+
+        const timestamps = this.mrmsStatus[variable] || [];
+        console.log(`[DEBUG] _preloadMRMSVariable: Starting preload for ${timestamps.length} timestamps for variable "${variable}".`);
+
+        // We assume the data loading happens inside _loadGridData.
+        const preloadPromises = timestamps.map(timestamp => {
+            const stateForTimestamp = { ...this.state, mrmsTimestamp: timestamp };
+            // This is the function that actually fetches data. We expect it to have its own logs.
+            return this._loadGridData(stateForTimestamp);
+        });
+
+        await Promise.all(preloadPromises);
+        console.log(`[DEBUG] _preloadMRMSVariable: Preload finished for variable "${variable}".`);
+    }
+
+    async setMRMSTimestamp(timestamp) {
+        if (!this.state.isMRMS) return;
+        await this.setState({ mrmsTimestamp: timestamp });
+    }
+
     startAutoRefresh(intervalSeconds) {
         const interval = intervalSeconds ?? this.autoRefreshIntervalSeconds ?? 60;
         this.stopAutoRefresh();
@@ -528,32 +729,81 @@ export class FillLayerManager extends EventEmitter {
     }
     
     async _loadGridData(state) {
-        const { model, date, run, forecastHour, variable, smoothing = 0 } = { ...this.baseLayerOptions, ...state };
-        const dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
+        const startTime = performance.now();
+        console.log('[_loadGridData] START', { state });
 
-        if (this.dataCache.has(dataUrlIdentifier)) {
-            return this.dataCache.get(dataUrlIdentifier);
+        const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = { ...this.baseLayerOptions, ...state };
+
+        let dataUrlIdentifier;
+        let dataUrl;
+
+        if (isMRMS) {
+            if (!mrmsTimestamp) {
+                console.error("[_loadGridData] Cannot fetch MRMS data without a timestamp.");
+                return null;
+            }
+            const mrmsDate = new Date(mrmsTimestamp * 1000);
+            const year = mrmsDate.getUTCFullYear();
+            const month = (mrmsDate.getUTCMonth() + 1).toString().padStart(2, '0');
+            const day = mrmsDate.getUTCDate().toString().padStart(2, '0');
+            const mrmsDateStr = `${year}${month}${day}`;
+            
+            const effectiveModel = 'mrms';
+            dataUrlIdentifier = `${effectiveModel}-${mrmsTimestamp}-${variable}-${smoothing || ''}`;
+            dataUrl = `${this.baseUrl}/${effectiveModel}/${mrmsDateStr}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
+        } else {
+            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
+            dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
         }
 
+        console.log('[_loadGridData] Data URL:', dataUrl);
+        console.log('[_loadGridData] Cache identifier:', dataUrlIdentifier);
+
+        if (this.dataCache.has(dataUrlIdentifier)) {
+            console.log('[_loadGridData] ✓ Returning from cache');
+            const cached = this.dataCache.get(dataUrlIdentifier);
+            console.log('[_loadGridData] COMPLETE (cached) - Total time:', (performance.now() - startTime).toFixed(2), 'ms');
+            return cached;
+        }
+
+        console.log('[_loadGridData] Cache MISS - fetching from network');
+
         const loadPromise = new Promise(async (resolve, reject) => {
-            const dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
             try {
+                const fetchStart = performance.now();
                 const response = await fetch(dataUrl);
+                console.log('[_loadGridData] Network fetch took:', (performance.now() - fetchStart).toFixed(2), 'ms');
+
                 if (!response.ok) throw new Error(`HTTP ${response.status} for ${dataUrl}`);
+                
+                const jsonStart = performance.now();
                 const { data: b64Data, encoding } = await response.json();
+                console.log('[_loadGridData] JSON parse took:', (performance.now() - jsonStart).toFixed(2), 'ms');
+                
+                const decodeStart = performance.now();
                 const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+                console.log('[_loadGridData] Base64 decode took:', (performance.now() - decodeStart).toFixed(2), 'ms');
+                console.log('[_loadGridData] Compressed size:', compressedData.length, 'bytes');
+
+                const workerStart = performance.now();
                 const requestId = this.workerRequestId++;
                 this.workerResolvers.set(requestId, { resolve, reject });
+                console.log('[_loadGridData] Sending to worker, requestId:', requestId);
                 this.worker.postMessage({ requestId, compressedData, encoding }, [compressedData.buffer]);
+                console.log('[_loadGridData] Worker message sent in:', (performance.now() - workerStart).toFixed(2), 'ms');
             } catch (error) {
+                console.error('[_loadGridData] ❌ Error:', error);
                 reject(error);
             }
         })
         .then(result => {
+            console.log('[_loadGridData] Worker returned successfully');
             this.dataCache.set(dataUrlIdentifier, result);
+            console.log('[_loadGridData] COMPLETE (new fetch) - Total time:', (performance.now() - startTime).toFixed(2), 'ms');
             return result;
         })
         .catch(error => {
+            console.error(`[_loadGridData] Failed to load from ${dataUrl}:`, error);
             this.dataCache.delete(dataUrlIdentifier);
             return null;
         });

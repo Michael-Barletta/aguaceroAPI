@@ -50,6 +50,9 @@ export class GridRenderLayer {
         this.currentConversion = {
             type: 0 
         };
+        this.dataTextureArray = null; // NEW: Will hold all timesteps
+        this.currentTimestep = 0; // NEW: Which layer to display
+        this.timestepCount = 0;
     }
 
     onAdd(map, gl) {
@@ -805,7 +808,7 @@ export class GridRenderLayer {
         }
     }
 
-    updateDataTexture(data, encoding, width, height) {
+     updateDataTexture(data, encoding, width, height) {
         // Exit if the WebGL context isn't available
         if (!this.gl) return;
 
@@ -833,19 +836,16 @@ export class GridRenderLayer {
         // Upload the pixel data to the GPU
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
 
-        // Set texture filtering to LINEAR to enable hardware-based bilinear interpolation.
-        // This is what makes the simplified shader work correctly.
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        // --- THIS IS THE FIX ---
+        // Change texture filtering from LINEAR to NEAREST. This prevents the GPU
+        // from interpolating between valid data and missing data at the edges,
+        // which was causing the colorful artifacts.
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
 
-        // --- THIS IS THE CRITICAL FIX FOR WRAPPING ---
-        // For global grids, we must use REPEAT to wrap horizontally.
-        // For all other regional grids, we clamp to the edge to prevent artifacts.
-        // The `this.isGlobal` flag is set in the `updateGeometry` method.
-        const wrapMode = this.isGlobal ? this.gl.REPEAT : this.gl.CLAMP_TO_EDGE;
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, wrapMode); // Horizontal wrap
-
-        // We always clamp vertically, as we don't want the poles to wrap.
+        // We can keep CLAMP_TO_EDGE as it's the correct wrapping mode for
+        // regional, non-repeating data.
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE); // Horizontal wrap
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE); // Vertical wrap
     }
     

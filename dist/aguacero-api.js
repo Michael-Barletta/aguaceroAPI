@@ -1,6 +1,6 @@
-import { MercatorCoordinate as Q } from "mapbox-gl";
+import { MercatorCoordinate as $ } from "mapbox-gl";
 import O from "proj4";
-class i0 {
+class ae {
   constructor() {
     this.callbacks = {};
   }
@@ -8,27 +8,27 @@ class i0 {
     this.callbacks[e] || (this.callbacks[e] = []), this.callbacks[e].push(t);
   }
   emit(e, t) {
-    let a = this.callbacks[e];
-    a && a.forEach((r) => r(t));
+    let i = this.callbacks[e];
+    i && i.forEach((r) => r(t));
   }
 }
 const V = 89;
-function a0(i, e) {
-  const a = 245.305142, r = Math.PI / 180, s = 180 / Math.PI, _ = 53.91148 * r, n = i * r, o = e * r, f = Math.sin(o), p = Math.cos(o), g = Math.sin(n), b = Math.cos(n), x = Math.sin(_), m = Math.cos(_), c = m * f + x * p * b;
-  let A = Math.asin(c) * s;
-  const P = p * g, z = -x * f + m * p * b;
-  let S = Math.atan2(P, z) * s + a;
-  return S > 180 ? S -= 360 : S < -180 && (S += 360), [S, A];
+function ie(a, e) {
+  const i = 245.305142, r = Math.PI / 180, l = 180 / Math.PI, _ = 53.91148 * r, n = a * r, s = e * r, c = Math.sin(s), d = Math.cos(s), g = Math.sin(n), f = Math.cos(n), x = Math.sin(_), p = Math.cos(_), o = p * c + x * d * f;
+  let L = Math.asin(o) * l;
+  const S = d * g, P = -x * c + p * d * f;
+  let y = Math.atan2(S, P) * l + i;
+  return y > 180 ? y -= 360 : y < -180 && (y += 360), [y, L];
 }
-class r0 {
+class re {
   constructor(e) {
     this.id = e, this.type = "custom", this.renderingMode = "2d", this.map = null, this.gl = null, this.program = null, this.opacity = 1, this.dataRange = [0, 1], this.vertexBuffer = null, this.indexBuffer = null, this.indexCount = 0, this.dataTexture = null, this.colormapTexture = null, this.encoding = null, this.textureWidth = 0, this.textureHeight = 0, this.cachedCorners = null, this.cachedGridDef = null, this.currentConversion = {
       type: 0
-    };
+    }, this.dataTextureArray = null, this.currentTimestep = 0, this.timestepCount = 0;
   }
   onAdd(e, t) {
     this.map = e, this.gl = t;
-    const a = `
+    const i = `
             attribute vec2 a_position;
             attribute vec2 a_texCoord;
             uniform mat4 u_matrix;
@@ -86,14 +86,14 @@ class r0 {
                 }
 
                 gl_FragColor = vec4(color.rgb, color.a * u_opacity);
-            }`, s = t.createShader(t.VERTEX_SHADER);
-    t.shaderSource(s, a), t.compileShader(s);
+            }`, l = t.createShader(t.VERTEX_SHADER);
+    t.shaderSource(l, i), t.compileShader(l);
     const _ = t.createShader(t.FRAGMENT_SHADER);
-    t.shaderSource(_, r), t.compileShader(_), this.program = t.createProgram(), t.attachShader(this.program, s), t.attachShader(this.program, _), t.linkProgram(this.program), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.cachedCorners && this.cachedGridDef && this.updateGeometry(this.cachedCorners, this.cachedGridDef);
+    t.shaderSource(_, r), t.compileShader(_), this.program = t.createProgram(), t.attachShader(this.program, l), t.attachShader(this.program, _), t.linkProgram(this.program), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.cachedCorners && this.cachedGridDef && this.updateGeometry(this.cachedCorners, this.cachedGridDef);
   }
   updateGeometry(e, t) {
     if (this.cachedCorners = e, this.cachedGridDef = t, !this.gl || !this.vertexBuffer) return;
-    const a = this.gl, r = 120;
+    const i = this.gl, r = 120;
     if ([
       e.lon_tl,
       e.lat_tl,
@@ -109,9 +109,9 @@ class r0 {
     }
     const _ = t.type;
     if (_ === "latlon") {
-      const n = [], o = [], f = e.lat_tl < e.lat_bl, p = t.grid_params && t.grid_params.lon_first === 336.5 && Math.abs(t.grid_params.lat_first) === 29.5, g = t.grid_params && t.grid_params.lon_first === 356.06 && Math.abs(t.grid_params.lat_first) === 43.18, b = t.grid_params && t.grid_params.lon_first === 0 && Math.abs(t.grid_params.lat_first) === 90, x = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === 90, m = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === -90 && t.grid_params.lon_last === 179.85;
-      let c = e;
-      if (b ? (c = {
+      const n = [], s = [], c = e.lat_tl < e.lat_bl, d = t.grid_params && t.grid_params.lon_first === 336.5 && Math.abs(t.grid_params.lat_first) === 29.5, g = t.grid_params && t.grid_params.lon_first === 356.06 && Math.abs(t.grid_params.lat_first) === 43.18, f = t.grid_params && t.grid_params.lon_first === 0 && Math.abs(t.grid_params.lat_first) === 90, x = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === 90, p = t.grid_params && t.grid_params.lon_first === 180 && t.grid_params.lat_first === -90 && t.grid_params.lon_last === 179.85;
+      let o = e;
+      if (f ? (o = {
         lon_tl: e.lon_tl - 180,
         lat_tl: e.lat_tl,
         lon_tr: e.lon_tr - 180,
@@ -120,9 +120,9 @@ class r0 {
         lat_bl: e.lat_bl,
         lon_br: e.lon_br - 180,
         lat_br: e.lat_br
-      }, Object.keys(c).forEach((C) => {
-        C.startsWith("lon_") && c[C] < -180 && (c[C] += 360);
-      })) : x ? c = {
+      }, Object.keys(o).forEach((k) => {
+        k.startsWith("lon_") && o[k] < -180 && (o[k] += 360);
+      })) : x ? o = {
         lon_tl: e.lon_tl >= 180 ? e.lon_tl - 360 : e.lon_tl,
         lat_tl: e.lat_tl,
         lon_tr: e.lon_tr >= 180 ? e.lon_tr - 360 : e.lon_tr,
@@ -131,293 +131,291 @@ class r0 {
         lat_bl: e.lat_bl,
         lon_br: e.lon_br >= 180 ? e.lon_br - 360 : e.lon_br,
         lat_br: e.lat_br
-      } : m && (c = e), Math.abs(c.lon_tr - c.lon_tl) >= 359 || m) {
-        const C = r * 3;
+      } : p && (o = e), Math.abs(o.lon_tr - o.lon_tl) >= 359 || p) {
+        const k = r * 3;
         for (let h = 0; h <= r; h++)
-          for (let T = 0; T <= C; T++) {
-            const w = T / r - 1;
-            let k;
-            m ? k = 1 - h / r : k = f ? 1 - h / r : h / r;
-            let u, l;
-            u = c.lon_tl - 360, l = c.lon_tr + 360;
-            const R = l - u, F = u + T / C * R, d = h / r, y = c.lat_tl + d * (c.lat_bl - c.lat_tl);
-            if (!isFinite(F) || !isFinite(y))
+          for (let R = 0; R <= k; R++) {
+            const b = R / r - 1;
+            let T;
+            p ? T = 1 - h / r : T = c ? 1 - h / r : h / r;
+            let w, m;
+            w = o.lon_tl - 360, m = o.lon_tr + 360;
+            const M = m - w, z = w + R / k * M, u = h / r, C = o.lat_tl + u * (o.lat_bl - o.lat_tl);
+            if (!isFinite(z) || !isFinite(C))
               continue;
-            const M = Q.fromLngLat({ lon: F, lat: y });
-            !isFinite(M.x) || !isFinite(M.y) || n.push(M.x, M.y, w, k);
+            const A = $.fromLngLat({ lon: z, lat: C });
+            !isFinite(A.x) || !isFinite(A.y) || n.push(A.x, A.y, b, T);
           }
-        const v = C + 1;
+        const v = k + 1;
         for (let h = 0; h < r; h++)
-          for (let T = 0; T < C; T++) {
-            const w = h * v + T, k = w + 1, u = (h + 1) * v + T, l = u + 1;
-            l < n.length / 4 && (o.push(w, u, k), o.push(k, u, l));
+          for (let R = 0; R < k; R++) {
+            const b = h * v + R, T = b + 1, w = (h + 1) * v + R, m = w + 1;
+            m < n.length / 4 && (s.push(b, w, T), s.push(T, w, m));
           }
       } else {
         if ([
-          c.lon_tl,
-          c.lat_tl,
-          c.lon_tr,
-          c.lat_tr,
-          c.lon_bl,
-          c.lat_bl,
-          c.lon_br,
-          c.lat_br
-        ].some((w) => !isFinite(w))) {
-          console.error("[GridLayer] Invalid adjusted corner coordinates:", c);
+          o.lon_tl,
+          o.lat_tl,
+          o.lon_tr,
+          o.lat_tr,
+          o.lon_bl,
+          o.lat_bl,
+          o.lon_br,
+          o.lat_br
+        ].some((b) => !isFinite(b))) {
+          console.error("[GridLayer] Invalid adjusted corner coordinates:", o);
           return;
         }
-        if ([c.lat_tl, c.lat_tr, c.lat_bl, c.lat_br].some((w) => w < -90 || w > 90)) {
-          console.error("[GridLayer] Invalid latitude values in corners:", c), console.error("[GridLayer] Original corners were:", e), console.error("[GridLayer] Grid definition:", t);
+        if ([o.lat_tl, o.lat_tr, o.lat_bl, o.lat_br].some((b) => b < -90 || b > 90)) {
+          console.error("[GridLayer] Invalid latitude values in corners:", o), console.error("[GridLayer] Original corners were:", e), console.error("[GridLayer] Grid definition:", t);
           return;
         }
-        const T = Math.abs(c.lon_tr - c.lon_tl) > 180;
-        for (let w = 0; w <= r; w++)
-          for (let k = 0; k <= r; k++) {
-            const u = k / r, l = w / r;
-            let R = u, F;
-            f && !g && !p ? F = 1 - l : F = l;
-            let d, y;
-            if (T) {
-              let U = c.lon_tl, E = c.lon_tr, G = c.lon_bl, H = c.lon_br;
-              for (E < U && (E += 360), H < G && (H += 360), d = (1 - l) * ((1 - u) * U + u * E) + l * ((1 - u) * G + u * H); d > 180; ) d -= 360;
-              for (; d < -180; ) d += 360;
+        const R = Math.abs(o.lon_tr - o.lon_tl) > 180;
+        for (let b = 0; b <= r; b++)
+          for (let T = 0; T <= r; T++) {
+            const w = T / r, m = b / r;
+            let M = w, z;
+            c && !g && !d ? z = 1 - m : z = m;
+            let u, C;
+            if (R) {
+              let U = o.lon_tl, I = o.lon_tr, D = o.lon_bl, H = o.lon_br;
+              for (I < U && (I += 360), H < D && (H += 360), u = (1 - m) * ((1 - w) * U + w * I) + m * ((1 - w) * D + w * H); u > 180; ) u -= 360;
+              for (; u < -180; ) u += 360;
             } else
-              d = (1 - l) * ((1 - u) * c.lon_tl + u * c.lon_tr) + l * ((1 - u) * c.lon_bl + u * c.lon_br);
-            if (y = (1 - l) * ((1 - u) * c.lat_tl + u * c.lat_tr) + l * ((1 - u) * c.lat_bl + u * c.lat_br), y = Math.max(-V, Math.min(V, y)), !isFinite(d) || !isFinite(y)) {
-              console.error(`[GridLayer] Invalid interpolated coordinates at ${w},${k}: lon=${d}, lat=${y}`), console.error("[GridLayer] Interpolation inputs:", {
-                t_x: u,
-                t_y: l,
-                corners: c,
-                gridType: b ? "GFS" : x ? "ECMWF" : isIconModel ? "ICON" : "OTHER"
+              u = (1 - m) * ((1 - w) * o.lon_tl + w * o.lon_tr) + m * ((1 - w) * o.lon_bl + w * o.lon_br);
+            if (C = (1 - m) * ((1 - w) * o.lat_tl + w * o.lat_tr) + m * ((1 - w) * o.lat_bl + w * o.lat_br), C = Math.max(-V, Math.min(V, C)), !isFinite(u) || !isFinite(C)) {
+              console.error(`[GridLayer] Invalid interpolated coordinates at ${b},${T}: lon=${u}, lat=${C}`), console.error("[GridLayer] Interpolation inputs:", {
+                t_x: w,
+                t_y: m,
+                corners: o,
+                gridType: f ? "GFS" : x ? "ECMWF" : isIconModel ? "ICON" : "OTHER"
               });
               continue;
             }
-            let M = d;
-            for (; M > 180; ) M -= 360;
-            for (; M < -180; ) M += 360;
-            const I = Q.fromLngLat({ lon: M, lat: y });
-            if (!isFinite(I.x) || !isFinite(I.y)) {
-              console.error(`[GridLayer] Invalid Mercator coordinates: x=${I.x}, y=${I.y}`);
+            let A = u;
+            for (; A > 180; ) A -= 360;
+            for (; A < -180; ) A += 360;
+            const F = $.fromLngLat({ lon: A, lat: C });
+            if (!isFinite(F.x) || !isFinite(F.y)) {
+              console.error(`[GridLayer] Invalid Mercator coordinates: x=${F.x}, y=${F.y}`);
               continue;
             }
-            n.push(I.x, I.y, R, F);
+            n.push(F.x, F.y, M, z);
           }
-        for (let w = 0; w < r; w++)
-          for (let k = 0; k < r; k++) {
-            const u = w * (r + 1) + k, l = u + 1, R = (w + 1) * (r + 1) + k, F = R + 1;
-            o.push(u, R, l), o.push(l, R, F);
+        for (let b = 0; b < r; b++)
+          for (let T = 0; T < r; T++) {
+            const w = b * (r + 1) + T, m = w + 1, M = (b + 1) * (r + 1) + T, z = M + 1;
+            s.push(w, M, m), s.push(m, M, z);
           }
       }
-      const z = new Float32Array(n);
-      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, z, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
-      const S = new Uint16Array(o);
-      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexCount = o.length, this.vertexCount = n.length / 4;
+      const P = new Float32Array(n);
+      i.bindBuffer(i.ARRAY_BUFFER, this.vertexBuffer), i.bufferData(i.ARRAY_BUFFER, P, i.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = i.createBuffer());
+      const y = new Uint16Array(s);
+      i.bindBuffer(i.ELEMENT_ARRAY_BUFFER, this.indexBuffer), i.bufferData(i.ELEMENT_ARRAY_BUFFER, y, i.STATIC_DRAW), this.indexCount = s.length, this.vertexCount = n.length / 4;
     } else if (_ === "rotated_latlon") {
       t.proj_params;
-      const n = [], o = [], { lon_first: f, lat_first: p, dx_degrees: g, dy_degrees: b, nx: x, ny: m } = t.grid_params, c = f, A = p, P = f + (x - 1) * g, z = p + (m - 1) * b;
+      const n = [], s = [], { lon_first: c, lat_first: d, dx_degrees: g, dy_degrees: f, nx: x, ny: p } = t.grid_params, o = c, L = d, S = c + (x - 1) * g, P = d + (p - 1) * f;
       for (let v = 0; v <= r; v++)
         for (let h = 0; h <= r; h++) {
-          const T = h / r, w = v / r, k = c + T * (P - c), u = A + w * (z - A);
+          const R = h / r, b = v / r, T = o + R * (S - o), w = L + b * (P - L);
           try {
-            const [l, R] = a0(k, u);
-            if (!isFinite(l) || !isFinite(R)) {
-              console.warn(`[GridLayer] Invalid HRDPS transformed coordinates at ${v},${h}: lon=${l}, lat=${R}`);
+            const [m, M] = ie(T, w);
+            if (!isFinite(m) || !isFinite(M)) {
+              console.warn(`[GridLayer] Invalid HRDPS transformed coordinates at ${v},${h}: lon=${m}, lat=${M}`);
               continue;
             }
-            const F = Math.max(-V, Math.min(V, R)), d = Q.fromLngLat({ lon: l, lat: F });
-            if (!isFinite(d.x) || !isFinite(d.y)) {
-              console.warn(`[GridLayer] Invalid HRDPS Mercator coordinates: x=${d.x}, y=${d.y}`);
+            const z = Math.max(-V, Math.min(V, M)), u = $.fromLngLat({ lon: m, lat: z });
+            if (!isFinite(u.x) || !isFinite(u.y)) {
+              console.warn(`[GridLayer] Invalid HRDPS Mercator coordinates: x=${u.x}, y=${u.y}`);
               continue;
             }
-            const y = T, M = 1 - w;
-            n.push(d.x, d.y, y, M);
-          } catch (l) {
-            console.warn(`[GridLayer] HRDPS manual transformation error at ${v},${h}:`, l);
+            const C = R, A = 1 - b;
+            n.push(u.x, u.y, C, A);
+          } catch (m) {
+            console.warn(`[GridLayer] HRDPS manual transformation error at ${v},${h}:`, m);
             continue;
           }
         }
       for (let v = 0; v < r; v++)
         for (let h = 0; h < r; h++) {
-          const T = v * (r + 1) + h, w = T + 1, k = (v + 1) * (r + 1) + h, u = k + 1;
-          u < n.length / 4 && (o.push(T, k, w), o.push(w, k, u));
+          const R = v * (r + 1) + h, b = R + 1, T = (v + 1) * (r + 1) + h, w = T + 1;
+          w < n.length / 4 && (s.push(R, T, b), s.push(b, T, w));
         }
-      const S = new Float32Array(n);
-      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, S, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
-      const C = new Uint16Array(o);
-      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, C, a.STATIC_DRAW), this.indexCount = o.length, this.vertexCount = n.length / 4;
+      const y = new Float32Array(n);
+      i.bindBuffer(i.ARRAY_BUFFER, this.vertexBuffer), i.bufferData(i.ARRAY_BUFFER, y, i.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = i.createBuffer());
+      const k = new Uint16Array(s);
+      i.bindBuffer(i.ELEMENT_ARRAY_BUFFER, this.indexBuffer), i.bufferData(i.ELEMENT_ARRAY_BUFFER, k, i.STATIC_DRAW), this.indexCount = s.length, this.vertexCount = n.length / 4;
     } else if (_ === "polar_stereographic") {
       const n = t.proj_params;
-      let o = `+proj=${n.proj}`;
-      Object.keys(n).forEach((l) => {
-        l !== "proj" && (o += ` +${l}=${n[l]}`);
-      }), o += " +lat_0=90 +no_defs";
-      const f = "EPSG:4326", { nx: p, ny: g, dx: b, dy: x, x_origin: m, y_origin: c } = t.grid_params, A = m, P = m + (p - 1) * b, z = c, S = c + (g - 1) * x, C = [], v = [], h = [];
-      let T = 0, w = NaN;
-      for (let l = 0; l <= r; l++) {
-        h[l] = [];
-        for (let R = 0; R <= r; R++) {
-          const F = R / r, d = l / r, y = A + F * (P - A), M = z + d * (S - z);
+      let s = `+proj=${n.proj}`;
+      Object.keys(n).forEach((m) => {
+        m !== "proj" && (s += ` +${m}=${n[m]}`);
+      }), s += " +lat_0=90 +no_defs";
+      const c = "EPSG:4326", { nx: d, ny: g, dx: f, dy: x, x_origin: p, y_origin: o } = t.grid_params, L = p, S = p + (d - 1) * f, P = o, y = o + (g - 1) * x, k = [], v = [], h = [];
+      let R = 0, b = NaN;
+      for (let m = 0; m <= r; m++) {
+        h[m] = [];
+        for (let M = 0; M <= r; M++) {
+          const z = M / r, u = m / r, C = L + z * (S - L), A = P + u * (y - P);
           try {
-            const [I, U] = O(o, f, [y, M]);
-            if (!isFinite(I) || !isFinite(U)) {
-              h[l][R] = null;
+            const [F, U] = O(s, c, [C, A]);
+            if (!isFinite(F) || !isFinite(U)) {
+              h[m][M] = null;
               continue;
             }
-            if (I > 0) {
-              console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${E} at [${l},${R}]`), h[l][R] = null;
+            if (F > 0) {
+              console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${I} at [${m},${M}]`), h[m][M] = null;
               continue;
             }
-            let E = I;
-            if (!isNaN(w)) {
-              for (; E - w > 180; )
-                E -= 360;
-              for (; w - E > 180; )
-                E += 360;
+            let I = F;
+            if (!isNaN(b)) {
+              for (; I - b > 180; )
+                I -= 360;
+              for (; b - I > 180; )
+                I += 360;
             }
-            w = E;
-            const G = Math.max(-V, Math.min(V, U)), H = Q.fromLngLat({ lon: E, lat: G });
+            b = I;
+            const D = Math.max(-V, Math.min(V, U)), H = $.fromLngLat({ lon: I, lat: D });
             if (!isFinite(H.x) || !isFinite(H.y)) {
-              h[l][R] = null;
+              h[m][M] = null;
               continue;
             }
-            const D = F, j = d;
-            h[l][R] = {
+            const B = z, j = u;
+            h[m][M] = {
               mercator_x: H.x,
               mercator_y: H.y,
-              tex_u: D,
+              tex_u: B,
               tex_v: j,
-              vertexIndex: T
-            }, C.push(H.x, H.y, D, j), T++;
+              vertexIndex: R
+            }, k.push(H.x, H.y, B, j), R++;
           } catch {
-            h[l][R] = null;
+            h[m][M] = null;
             continue;
           }
         }
       }
-      if (C.length === 0) {
+      if (k.length === 0) {
         console.error("[GridLayer] No valid vertices generated for polar stereographic model");
         return;
       }
-      for (let l = 0; l < r; l++)
-        for (let R = 0; R < r; R++) {
-          const F = h[l][R], d = h[l][R + 1], y = h[l + 1][R], M = h[l + 1][R + 1];
-          F && d && y && M && (v.push(
-            F.vertexIndex,
-            y.vertexIndex,
-            d.vertexIndex
+      for (let m = 0; m < r; m++)
+        for (let M = 0; M < r; M++) {
+          const z = h[m][M], u = h[m][M + 1], C = h[m + 1][M], A = h[m + 1][M + 1];
+          z && u && C && A && (v.push(
+            z.vertexIndex,
+            C.vertexIndex,
+            u.vertexIndex
           ), v.push(
-            d.vertexIndex,
-            y.vertexIndex,
-            M.vertexIndex
+            u.vertexIndex,
+            C.vertexIndex,
+            A.vertexIndex
           ));
         }
-      const k = new Float32Array(C);
-      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, k, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
-      const u = new Uint16Array(v);
-      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, u, a.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = C.length / 4;
+      const T = new Float32Array(k);
+      i.bindBuffer(i.ARRAY_BUFFER, this.vertexBuffer), i.bufferData(i.ARRAY_BUFFER, T, i.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = i.createBuffer());
+      const w = new Uint16Array(v);
+      i.bindBuffer(i.ELEMENT_ARRAY_BUFFER, this.indexBuffer), i.bufferData(i.ELEMENT_ARRAY_BUFFER, w, i.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = k.length / 4;
     } else if (_ === "lambert_conformal_conic") {
       const n = t.proj_params;
-      let o = `+proj=${n.proj}`;
-      Object.keys(n).forEach((d) => {
-        d !== "proj" && (o += ` +${d}=${n[d]}`);
-      }), o += " +no_defs";
-      const f = "EPSG:4326", { nx: p, ny: g, dx: b, dy: x, x_origin: m, y_origin: c } = t.grid_params, A = m, P = c, z = m + (p - 1) * b, S = c + (g - 1) * x, C = [], v = [];
-      let h = 1 / 0, T = -1 / 0, w = 1 / 0, k = -1 / 0, u = 0;
-      const l = [];
-      for (let d = 0; d <= r; d++)
-        l[d] = [];
-      for (let d = 0; d <= r; d++)
-        for (let y = 0; y <= r; y++) {
-          const M = y / r, I = d / r, U = A + M * (z - A), E = P + I * (S - P);
+      let s = `+proj=${n.proj}`;
+      Object.keys(n).forEach((u) => {
+        u !== "proj" && (s += ` +${u}=${n[u]}`);
+      }), s += " +no_defs";
+      const c = "EPSG:4326", { nx: d, ny: g, dx: f, dy: x, x_origin: p, y_origin: o } = t.grid_params, L = p, S = o, P = p + (d - 1) * f, y = o + (g - 1) * x, k = [], v = [];
+      let h = 1 / 0, R = -1 / 0, b = 1 / 0, T = -1 / 0, w = 0;
+      const m = [];
+      for (let u = 0; u <= r; u++)
+        m[u] = [];
+      for (let u = 0; u <= r; u++)
+        for (let C = 0; C <= r; C++) {
+          const A = C / r, F = u / r, U = L + A * (P - L), I = S + F * (y - S);
           try {
-            const [G, H] = O(o, f, [U, E]);
-            if (G > 0) {
-              console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${G} at [${d},${y}]`), l[d][y] = null;
+            const [D, H] = O(s, c, [U, I]);
+            if (D > 0) {
+              console.warn(`[GridLayer] Rejecting suspicious positive longitude: ${D} at [${u},${C}]`), m[u][C] = null;
               continue;
             }
-            h = Math.min(h, G), T = Math.max(T, G), w = Math.min(w, H), k = Math.max(k, H);
-            const D = Q.fromLngLat({ lon: G, lat: H });
-            if (!isFinite(D.x) || !isFinite(D.y)) {
-              l[d][y] = null;
+            h = Math.min(h, D), R = Math.max(R, D), b = Math.min(b, H), T = Math.max(T, H);
+            const B = $.fromLngLat({ lon: D, lat: H });
+            if (!isFinite(B.x) || !isFinite(B.y)) {
+              m[u][C] = null;
               continue;
             }
-            const j = M, Y = I;
-            l[d][y] = {
-              mercator_x: D.x,
-              mercator_y: D.y,
+            const j = A, Z = F;
+            m[u][C] = {
+              mercator_x: B.x,
+              mercator_y: B.y,
               tex_u: j,
-              tex_v: Y,
-              vertexIndex: u
-            }, C.push(D.x, D.y, j, Y), u++;
-          } catch (G) {
-            console.warn(`[GridLayer] Projection error at [${d},${y}] with coords [${U}, ${E}]:`, G), l[d][y] = null;
+              tex_v: Z,
+              vertexIndex: w
+            }, k.push(B.x, B.y, j, Z), w++;
+          } catch (D) {
+            console.warn(`[GridLayer] Projection error at [${u},${C}] with coords [${U}, ${I}]:`, D), m[u][C] = null;
             continue;
           }
         }
-      if (C.length === 0) {
+      if (k.length === 0) {
         console.error(`[GridLayer] No valid vertices generated for ${this.modelName}`);
         return;
       }
-      for (let d = 0; d < r; d++)
-        for (let y = 0; y < r; y++) {
-          const M = l[d][y], I = l[d][y + 1], U = l[d + 1][y], E = l[d + 1][y + 1];
-          M && I && U && E && (v.push(
-            M.vertexIndex,
+      for (let u = 0; u < r; u++)
+        for (let C = 0; C < r; C++) {
+          const A = m[u][C], F = m[u][C + 1], U = m[u + 1][C], I = m[u + 1][C + 1];
+          A && F && U && I && (v.push(
+            A.vertexIndex,
+            U.vertexIndex,
+            F.vertexIndex
+          ), v.push(
+            F.vertexIndex,
             U.vertexIndex,
             I.vertexIndex
-          ), v.push(
-            I.vertexIndex,
-            U.vertexIndex,
-            E.vertexIndex
           ));
         }
-      T - h > 180 && console.warn(`[GridLayer] ${this.modelName} longitude span is ${(T - h).toFixed(2)}° - this might indicate projection issues`);
-      const R = new Float32Array(C);
-      a.bindBuffer(a.ARRAY_BUFFER, this.vertexBuffer), a.bufferData(a.ARRAY_BUFFER, R, a.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = a.createBuffer());
-      const F = new Uint16Array(v);
-      a.bindBuffer(a.ELEMENT_ARRAY_BUFFER, this.indexBuffer), a.bufferData(a.ELEMENT_ARRAY_BUFFER, F, a.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = C.length / 4;
+      R - h > 180 && console.warn(`[GridLayer] ${this.modelName} longitude span is ${(R - h).toFixed(2)}° - this might indicate projection issues`);
+      const M = new Float32Array(k);
+      i.bindBuffer(i.ARRAY_BUFFER, this.vertexBuffer), i.bufferData(i.ARRAY_BUFFER, M, i.STATIC_DRAW), this.indexBuffer || (this.indexBuffer = i.createBuffer());
+      const z = new Uint16Array(v);
+      i.bindBuffer(i.ELEMENT_ARRAY_BUFFER, this.indexBuffer), i.bufferData(i.ELEMENT_ARRAY_BUFFER, z, i.STATIC_DRAW), this.indexCount = v.length, this.vertexCount = k.length / 4;
     } else {
       console.error(`[GridLayer] Unsupported grid type: ${_}`);
       return;
     }
   }
-  updateDataTexture(e, t, a, r) {
+  updateDataTexture(e, t, i, r) {
     if (!this.gl) return;
-    this.encoding = t, this.textureWidth = a, this.textureHeight = r;
-    const s = new Uint8Array(e.length);
-    for (let n = 0; n < e.length; n++) {
-      const o = e[n] > 127 ? e[n] - 256 : e[n];
-      s[n] = o + 128;
+    this.encoding = t, this.textureWidth = i, this.textureHeight = r;
+    const l = new Uint8Array(e.length);
+    for (let _ = 0; _ < e.length; _++) {
+      const n = e[_] > 127 ? e[_] - 256 : e[_];
+      l[_] = n + 128;
     }
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture), this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, a, r, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, s), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-    const _ = this.isGlobal ? this.gl.REPEAT : this.gl.CLAMP_TO_EDGE;
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, _), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture), this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, i, r, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, l), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
   updateColormapTexture(e) {
     if (!this.gl) return;
-    const t = 256, a = new Uint8Array(t * 4), r = e.reduce((o, f, p) => p % 2 === 0 ? [...o, { value: e[p], color: e[p + 1] }] : o, []);
+    const t = 256, i = new Uint8Array(t * 4), r = e.reduce((s, c, d) => d % 2 === 0 ? [...s, { value: e[d], color: e[d + 1] }] : s, []);
     if (r.length === 0) return;
-    const s = r[0].value, _ = r[r.length - 1].value, n = (o) => [parseInt(o.slice(1, 3), 16), parseInt(o.slice(3, 5), 16), parseInt(o.slice(5, 7), 16)];
-    for (let o = 0; o < t; o++) {
-      const f = s + o / (t - 1) * (_ - s);
-      let p = r[0], g = r[r.length - 1];
-      for (let m = 0; m < r.length - 1; m++)
-        if (f >= r[m].value && f <= r[m + 1].value) {
-          p = r[m], g = r[m + 1];
+    const l = r[0].value, _ = r[r.length - 1].value, n = (s) => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
+    for (let s = 0; s < t; s++) {
+      const c = l + s / (t - 1) * (_ - l);
+      let d = r[0], g = r[r.length - 1];
+      for (let p = 0; p < r.length - 1; p++)
+        if (c >= r[p].value && c <= r[p + 1].value) {
+          d = r[p], g = r[p + 1];
           break;
         }
-      const b = (f - p.value) / (g.value - p.value || 1), x = n(p.color).map((m, c) => m * (1 - b) + n(g.color)[c] * b);
-      a.set(x, o * 4), a[o * 4 + 3] = 255;
+      const f = (c - d.value) / (g.value - d.value || 1), x = n(d.color).map((p, o) => p * (1 - f) + n(g.color)[o] * f);
+      i.set(x, s * 4), i[s * 4 + 3] = 255;
     }
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, t, 1, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, a), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.colormapTexture), this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, t, 1, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, i), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE), this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
   }
   updateStyle({ opacity: e, dataRange: t }) {
     e !== void 0 && (this.opacity = e), t !== void 0 && (this.dataRange = t);
   }
   setUnitConversion(e, t) {
-    let a = 0;
+    let i = 0;
     const r = (e || "").toLowerCase();
-    (r.includes("c") || r.includes("f")) && (t === "metric" ? a = 1 : t === "imperial" && (a = 2)), this.currentConversion.type = a, this.map && this.map.triggerRepaint();
+    (r.includes("c") || r.includes("f")) && (t === "metric" ? i = 1 : t === "imperial" && (i = 2)), this.currentConversion.type = i, this.map && this.map.triggerRepaint();
   }
   render(e, t) {
     !this.program || !this.encoding || !this.vertexBuffer || !this.indexBuffer || (e.useProgram(this.program), e.uniformMatrix4fv(this.u_matrix, !1, t), e.uniform1f(this.u_opacity, this.opacity), e.uniform2f(this.u_data_range, this.dataRange[0], this.dataRange[1]), e.uniform1f(this.u_scale, this.encoding.scale), e.uniform1f(this.u_offset, this.encoding.offset), e.uniform1f(this.u_missing_quantized, this.encoding.missing_quantized || 127), e.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight), e.uniform1i(this.u_conversion_type, this.currentConversion.type), e.activeTexture(e.TEXTURE0), e.bindTexture(e.TEXTURE_2D, this.dataTexture), e.uniform1i(this.u_data_texture, 0), e.activeTexture(e.TEXTURE1), e.bindTexture(e.TEXTURE_2D, this.colormapTexture), e.uniform1i(this.u_colormap_texture, 1), e.bindBuffer(e.ARRAY_BUFFER, this.vertexBuffer), e.enableVertexAttribArray(this.a_position), e.vertexAttribPointer(this.a_position, 2, e.FLOAT, !1, 16, 0), e.enableVertexAttribArray(this.a_texCoord), e.vertexAttribPointer(this.a_texCoord, 2, e.FLOAT, !1, 16, 8), e.bindBuffer(e.ELEMENT_ARRAY_BUFFER, this.indexBuffer), e.enable(e.BLEND), e.blendFunc(e.SRC_ALPHA, e.ONE_MINUS_SRC_ALPHA), e.drawElements(e.TRIANGLES, this.indexCount, e.UNSIGNED_SHORT, 0));
@@ -426,7 +424,7 @@ class r0 {
     this.gl && (this.program && this.gl.deleteProgram(this.program), this.vertexBuffer && this.gl.deleteBuffer(this.vertexBuffer), this.indexBuffer && this.gl.deleteBuffer(this.indexBuffer), this.dataTexture && this.gl.deleteTexture(this.dataTexture), this.colormapTexture && this.gl.deleteTexture(this.colormapTexture));
   }
 }
-const n0 = {
+const ne = {
   arome1: {
     type: "latlon",
     proj_params: {
@@ -799,62 +797,62 @@ const n0 = {
       lat_last: 20.005001
     }
   }
-}, o0 = {
-  kelvin_to_celsius: (i) => i - 273.15,
-  kelvin_to_fahrenheit: (i) => (i - 273.15) * 9 / 5 + 32,
-  kelvin_to_c: (i) => i - 273.15,
-  kelvin_to_f: (i) => (i - 273.15) * 9 / 5 + 32,
-  k_to_celsius: (i) => i - 273.15,
-  k_to_fahrenheit: (i) => (i - 273.15) * 9 / 5 + 32,
-  k_to_c: (i) => i - 273.15,
-  k_to_f: (i) => (i - 273.15) * 9 / 5 + 32,
-  celsius_to_fahrenheit: (i) => i * 9 / 5 + 32,
-  celsius_to_f: (i) => i * 9 / 5 + 32,
-  c_to_fahrenheit: (i) => i * 9 / 5 + 32,
-  c_to_f: (i) => i * 9 / 5 + 32,
-  fahrenheit_to_celsius: (i) => (i - 32) * 5 / 9,
-  fahrenheit_to_c: (i) => (i - 32) * 5 / 9,
-  f_to_celsius: (i) => (i - 32) * 5 / 9,
-  f_to_c: (i) => (i - 32) * 5 / 9,
-  meters_to_feet: (i) => i * 3.28084,
-  meters_to_km: (i) => i / 1e3,
-  m_to_feet: (i) => i * 3.28084,
-  m_to_ft: (i) => i * 3.28084,
-  m_to_km: (i) => i / 1e3,
-  kts_to_mph: (i) => i * 1.15078,
-  mph_to_kts: (i) => i / 1.15078,
-  kts_to_ms: (i) => i / 1.94384449,
-  mph_to_ms: (i) => i / 2.23693629,
-  ms_to_mph: (i) => i * 2.23694,
-  ms_to_kts: (i) => i * 1.94384,
-  kts_to_kmh: (i) => i * 1.852,
-  mph_to_kmh: (i) => i * 1.60934,
-  ms_to_kmh: (i) => i * 3.6,
-  kmh_to_kts: (i) => i / 1.852,
-  kmh_to_mph: (i) => i / 1.60934,
-  kmh_to_ms: (i) => i / 3.6,
-  inches_to_mm: (i) => i * 25.4,
-  inches_to_cm: (i) => i * 2.54,
-  in_to_mm: (i) => i * 25.4,
-  in_to_cm: (i) => i * 2.54,
-  mm_to_in: (i) => i / 25.4,
-  mm_to_inches: (i) => i / 25.4,
-  cm_to_in: (i) => i / 2.54,
-  cm_to_inches: (i) => i / 2.54,
-  inhr_to_mmhr: (i) => i * 25.4,
-  inhr_to_cmhr: (i) => i * 2.54,
-  in_hr_to_mm_hr: (i) => i * 25.4,
-  in_hr_to_cm_hr: (i) => i * 2.54,
-  mmhr_to_inhr: (i) => i / 25.4,
-  cmhr_to_inhr: (i) => i / 2.54,
-  mm_hr_to_in_hr: (i) => i / 25.4,
-  cm_hr_to_in_hr: (i) => i / 2.54,
-  mmhr_to_cmhr: (i) => i / 10,
-  cmhr_to_mmhr: (i) => i * 10,
-  mm_hr_to_cm_hr: (i) => i / 10,
-  cm_hr_to_mm_hr: (i) => i * 10
+}, se = {
+  kelvin_to_celsius: (a) => a - 273.15,
+  kelvin_to_fahrenheit: (a) => (a - 273.15) * 9 / 5 + 32,
+  kelvin_to_c: (a) => a - 273.15,
+  kelvin_to_f: (a) => (a - 273.15) * 9 / 5 + 32,
+  k_to_celsius: (a) => a - 273.15,
+  k_to_fahrenheit: (a) => (a - 273.15) * 9 / 5 + 32,
+  k_to_c: (a) => a - 273.15,
+  k_to_f: (a) => (a - 273.15) * 9 / 5 + 32,
+  celsius_to_fahrenheit: (a) => a * 9 / 5 + 32,
+  celsius_to_f: (a) => a * 9 / 5 + 32,
+  c_to_fahrenheit: (a) => a * 9 / 5 + 32,
+  c_to_f: (a) => a * 9 / 5 + 32,
+  fahrenheit_to_celsius: (a) => (a - 32) * 5 / 9,
+  fahrenheit_to_c: (a) => (a - 32) * 5 / 9,
+  f_to_celsius: (a) => (a - 32) * 5 / 9,
+  f_to_c: (a) => (a - 32) * 5 / 9,
+  meters_to_feet: (a) => a * 3.28084,
+  meters_to_km: (a) => a / 1e3,
+  m_to_feet: (a) => a * 3.28084,
+  m_to_ft: (a) => a * 3.28084,
+  m_to_km: (a) => a / 1e3,
+  kts_to_mph: (a) => a * 1.15078,
+  mph_to_kts: (a) => a / 1.15078,
+  kts_to_ms: (a) => a / 1.94384449,
+  mph_to_ms: (a) => a / 2.23693629,
+  ms_to_mph: (a) => a * 2.23694,
+  ms_to_kts: (a) => a * 1.94384,
+  kts_to_kmh: (a) => a * 1.852,
+  mph_to_kmh: (a) => a * 1.60934,
+  ms_to_kmh: (a) => a * 3.6,
+  kmh_to_kts: (a) => a / 1.852,
+  kmh_to_mph: (a) => a / 1.60934,
+  kmh_to_ms: (a) => a / 3.6,
+  inches_to_mm: (a) => a * 25.4,
+  inches_to_cm: (a) => a * 2.54,
+  in_to_mm: (a) => a * 25.4,
+  in_to_cm: (a) => a * 2.54,
+  mm_to_in: (a) => a / 25.4,
+  mm_to_inches: (a) => a / 25.4,
+  cm_to_in: (a) => a / 2.54,
+  cm_to_inches: (a) => a / 2.54,
+  inhr_to_mmhr: (a) => a * 25.4,
+  inhr_to_cmhr: (a) => a * 2.54,
+  in_hr_to_mm_hr: (a) => a * 25.4,
+  in_hr_to_cm_hr: (a) => a * 2.54,
+  mmhr_to_inhr: (a) => a / 25.4,
+  cmhr_to_inhr: (a) => a / 2.54,
+  mm_hr_to_in_hr: (a) => a / 25.4,
+  cm_hr_to_in_hr: (a) => a / 2.54,
+  mmhr_to_cmhr: (a) => a / 10,
+  cmhr_to_mmhr: (a) => a * 10,
+  mm_hr_to_cm_hr: (a) => a / 10,
+  cm_hr_to_mm_hr: (a) => a * 10
 };
-function s0(i, e) {
+function oe(a, e) {
   const t = {
     "°c": "c",
     "°f": "f",
@@ -884,14 +882,14 @@ function s0(i, e) {
     "cm/hr": "cmhr",
     in: "in",
     inches: "in"
-  }, a = (n) => {
+  }, i = (n) => {
     if (!n) return "";
-    const o = n.toLowerCase().trim();
-    return t[o] || o;
-  }, r = a(i), s = a(e), _ = `${r}_to_${s}`;
-  return o0[_] || null;
+    const s = n.toLowerCase().trim();
+    return t[s] || s;
+  }, r = i(a), l = i(e), _ = `${r}_to_${l}`;
+  return se[_] || null;
 }
-const c0 = {
+const _e = {
   mrms: {
     vars: [
       "MergedReflectivityQCComposite_00.50",
@@ -1554,7 +1552,7 @@ const c0 = {
     skewt: !0,
     order: 2
   }
-}, q = {
+}, Q = {
   fld: {
     "": {
       category: "",
@@ -5061,8109 +5059,70 @@ const c0 = {
     t_925iso0: "t_iso",
     "2t_2iso0": "t_iso"
   }
-}, _0 = {
-  "MergedZdr_04.00": {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dB: {
-        colormap: [
-          -4,
-          "#404040",
-          -2,
-          "#808080",
-          -0.5,
-          "#c0c0c0",
-          0,
-          "#e0e0e0",
-          0.3,
-          "#9966cc",
-          0.6,
-          "#000080",
-          1,
-          "#0066cc",
-          1.5,
-          "#00cccc",
-          2,
-          "#00ff00",
-          2.5,
-          "#ffff00",
-          3,
-          "#ff9900",
-          4,
-          "#ff0000",
-          5,
-          "#cc0000",
-          6,
-          "#ff66cc",
-          8,
-          "#ffffff",
-          20,
-          "#800080"
-        ],
-        breakpoints: [
-          -4,
-          -2,
-          -0.5,
-          0,
-          0.3,
-          0.6,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          4,
-          5,
-          6,
-          8,
-          20
-        ]
-      }
-    }
-  },
-  "MergedRhoHV_04.00": {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0.2,
-          "#c0c0c0",
-          0.45,
-          "#c0c0c0",
-          0.65,
-          "#000080",
-          0.75,
-          "#0000ff",
-          0.8,
-          "#8066ff",
-          0.85,
-          "#00ff00",
-          0.9,
-          "#80ff00",
-          0.93,
-          "#ffff00",
-          0.95,
-          "#ffcc00",
-          0.96,
-          "#ff9900",
-          0.97,
-          "#ff6600",
-          0.98,
-          "#ff0000",
-          0.99,
-          "#cc0000",
-          1,
-          "#800080",
-          1.05,
-          "#ffccff",
-          3,
-          "#800080"
-        ],
-        breakpoints: [
-          0.2,
-          0.45,
-          0.65,
-          0.75,
-          0.8,
-          0.85,
-          0.9,
-          0.93,
-          0.95,
-          0.96,
-          0.97,
-          0.98,
-          0.99,
-          1,
-          1.05,
-          3
-        ]
-      }
-    }
-  },
-  rotation: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "s⁻¹": {
-        colormap: [
-          0,
-          "#e0e0e0",
-          3e-3,
-          "#c0c0c0",
-          4e-3,
-          "#a0a0a0",
-          5e-3,
-          "#808080",
-          6e-3,
-          "#666600",
-          7e-3,
-          "#999900",
-          8e-3,
-          "#cccc00",
-          9e-3,
-          "#ffff00",
-          0.01,
-          "#ffff00",
-          0.011,
-          "#cc0000",
-          0.012,
-          "#cc0000",
-          0.013,
-          "#ff0000",
-          0.014,
-          "#ff0000",
-          0.015,
-          "#ff0000",
-          0.02,
-          "#00ffff"
-        ],
-        breakpoints: [
-          0,
-          3e-3,
-          4e-3,
-          5e-3,
-          6e-3,
-          7e-3,
-          8e-3,
-          9e-3,
-          0.01,
-          0.011,
-          0.012,
-          0.013,
-          0.014,
-          0.015,
-          0.02
-        ]
-      }
-    }
-  },
-  hail: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      mm: {
-        colormap: [
-          0,
-          "#00ffff",
-          1,
-          "#00ffff",
-          2,
-          "#0099ff",
-          4,
-          "#0066ff",
-          6,
-          "#00ff00",
-          8,
-          "#00ff00",
-          10,
-          "#00ff00",
-          15,
-          "#ffff00",
-          20,
-          "#ffcc00",
-          30,
-          "#ff9900",
-          40,
-          "#ff0000",
-          50,
-          "#ff0000",
-          75,
-          "#ff00ff",
-          100,
-          "#8000ff"
-        ],
-        breakpoints: [
-          0,
-          1,
-          2,
-          4,
-          6,
-          8,
-          10,
-          15,
-          20,
-          30,
-          40,
-          50,
-          75,
-          100
-        ]
-      }
-    }
-  },
-  ff_ari: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      year: {
-        colormap: [
-          0,
-          "#e0e0e0",
-          1,
-          "#00ff00",
-          2,
-          "#00ff00",
-          3,
-          "#ffff00",
-          4,
-          "#ffff00",
-          6,
-          "#ffcc00",
-          8,
-          "#ff9900",
-          10,
-          "#ff9900",
-          20,
-          "#ff0000",
-          30,
-          "#ff0000",
-          40,
-          "#ff0000",
-          50,
-          "#ff0000",
-          75,
-          "#ff00ff",
-          100,
-          "#ff00ff",
-          200,
-          "#8000ff"
-        ],
-        breakpoints: [
-          0,
-          1,
-          2,
-          3,
-          4,
-          6,
-          8,
-          10,
-          20,
-          30,
-          40,
-          50,
-          75,
-          100,
-          200
-        ]
-      }
-    }
-  },
-  lightning_prob: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          10,
-          "#00ccff",
-          20,
-          "#0066ff",
-          30,
-          "#00ff00",
-          40,
-          "#00ff00",
-          50,
-          "#00ff00",
-          60,
-          "#ffff00",
-          70,
-          "#ff9900",
-          80,
-          "#ffccff",
-          90,
-          "#ff00ff",
-          100,
-          "#ffffff"
-        ],
-        breakpoints: [
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      }
-    }
-  },
-  vil: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "kg/m²": {
-        colormap: [
-          0.1,
-          "#00ffff",
-          1,
-          "#00ffff",
-          2,
-          "#0099ff",
-          3,
-          "#0066ff",
-          4,
-          "#00ff00",
-          5,
-          "#00ff00",
-          6,
-          "#00ff00",
-          7,
-          "#ffff00",
-          8,
-          "#ffcc00",
-          10,
-          "#ff9900",
-          12,
-          "#ff0000",
-          15,
-          "#ff0000",
-          18,
-          "#ff00ff",
-          25,
-          "#8000ff",
-          30,
-          "#8000ff",
-          40,
-          "#ffffff",
-          50,
-          "#e0e0e0",
-          60,
-          "#c0c0c0",
-          70,
-          "#606060"
-        ],
-        breakpoints: [
-          0.1,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          10,
-          12,
-          15,
-          18,
-          25,
-          30,
-          40,
-          50,
-          60,
-          70
-        ]
-      }
-    }
-  },
-  gh_tendency: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          -60,
-          "#0000cc",
-          -30,
-          "#0000cc",
-          0,
-          "#ffffff",
-          30,
-          "#e60000",
-          60,
-          "#e60000"
-        ],
-        breakpoints: [
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60
-        ]
-      }
-    }
-  },
-  refc_0: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dBZ: {
-        colormap: [
-          5,
-          "#2980dc",
-          15,
-          "#00b2d4",
-          20,
-          "#00cc99",
-          25,
-          "#00e07f",
-          30,
-          "#8fd42a",
-          35,
-          "#ffcc00",
-          40,
-          "#ff8c00",
-          45,
-          "#ff6633",
-          50,
-          "#ff3333",
-          55,
-          "#cc3399",
-          60,
-          "#a020f0",
-          65,
-          "#8822ee",
-          70,
-          "#7425e6",
-          75,
-          "#cc33cc",
-          80,
-          "#ff66dd"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80
-        ]
-      }
-    }
-  },
-  mslma_0: {
-    type: "line",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      hPa: {
-        colormap: [
-          900,
-          "#0033ff",
-          1e3,
-          "#00d5ff",
-          1002,
-          "#ff6666",
-          1060,
-          "#ff0000"
-        ],
-        breakpoints: [
-          870,
-          872,
-          874,
-          876,
-          878,
-          880,
-          882,
-          884,
-          886,
-          888,
-          890,
-          892,
-          894,
-          896,
-          898,
-          900,
-          902,
-          904,
-          906,
-          908,
-          910,
-          912,
-          914,
-          916,
-          918,
-          920,
-          922,
-          924,
-          926,
-          928,
-          930,
-          932,
-          934,
-          936,
-          938,
-          940,
-          942,
-          944,
-          946,
-          948,
-          950,
-          952,
-          954,
-          956,
-          958,
-          960,
-          962,
-          964,
-          966,
-          968,
-          970,
-          972,
-          974,
-          976,
-          978,
-          980,
-          982,
-          984,
-          986,
-          988,
-          990,
-          992,
-          994,
-          996,
-          998,
-          1e3,
-          1002,
-          1004,
-          1006,
-          1008,
-          1010,
-          1012,
-          1014,
-          1016,
-          1018,
-          1020,
-          1022,
-          1024,
-          1026,
-          1028,
-          1030,
-          1032,
-          1034,
-          1036,
-          1038,
-          1040,
-          1042,
-          1044,
-          1046,
-          1048,
-          1050,
-          1052,
-          1054,
-          1056,
-          1058,
-          1060,
-          1062,
-          1064,
-          1066,
-          1068,
-          1070,
-          1072,
-          1074,
-          1076,
-          1078,
-          1080,
-          1082,
-          1084,
-          1086,
-          1088,
-          1090
-        ]
-      }
-    }
-  },
-  pres2PVU: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      hPa: {
-        colormap: [
-          20,
-          "#cc3333",
-          150,
-          "#ff9933",
-          210,
-          "#ffdd00",
-          375,
-          "#33cc66",
-          390,
-          "#3366cc",
-          510,
-          "#4d88ff",
-          570,
-          "#66e6ff",
-          645,
-          "#ff99ff",
-          750,
-          "#cc33cc"
-        ],
-        breakpoints: [
-          30,
-          45,
-          60,
-          75,
-          90,
-          105,
-          120,
-          135,
-          150,
-          165,
-          180,
-          195,
-          210,
-          225,
-          240,
-          255,
-          270,
-          285,
-          300,
-          315,
-          330,
-          345,
-          360,
-          375,
-          390,
-          405,
-          420,
-          435,
-          450,
-          465,
-          480,
-          495,
-          510,
-          525,
-          540,
-          555,
-          570,
-          585,
-          600,
-          615,
-          630,
-          645,
-          660,
-          675,
-          690,
-          705,
-          720,
-          735,
-          750,
-          765,
-          780,
-          795,
-          810,
-          825,
-          840
-        ]
-      }
-    }
-  },
-  theta2PVU: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°K": {
-        colormap: [
-          260,
-          "#cc66cc",
-          300,
-          "#cc0066",
-          320,
-          "#66ccff",
-          345,
-          "#3366cc",
-          350,
-          "#00cc33",
-          375,
-          "#ffee00",
-          450,
-          "#ff3333"
-        ],
-        breakpoints: [
-          260,
-          265,
-          270,
-          275,
-          280,
-          285,
-          290,
-          295,
-          300,
-          305,
-          310,
-          315,
-          320,
-          325,
-          330,
-          335,
-          340,
-          345,
-          350,
-          355,
-          360,
-          365,
-          370,
-          375,
-          380,
-          385,
-          390,
-          395,
-          400,
-          405,
-          410,
-          415,
-          420,
-          425,
-          430,
-          435,
-          440,
-          445,
-          450,
-          455,
-          460,
-          465,
-          470,
-          475,
-          480,
-          485,
-          490,
-          495
-        ]
-      }
-    }
-  },
-  vo: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "s⁻¹": {
-        colormap: [
-          -80,
-          "#444444",
-          -40,
-          "#444444",
-          0,
-          "#dddddd",
-          4,
-          "#ffee66",
-          12,
-          "#ff9933",
-          20,
-          "#ff6600",
-          32,
-          "#cc3366",
-          40,
-          "#9933aa",
-          60,
-          "#3333ff",
-          72,
-          "#333399",
-          80,
-          "#00ffff",
-          150,
-          "#ffffffff"
-        ],
-        breakpoints: [
-          -80,
-          -76,
-          -72,
-          -68,
-          -64,
-          -60,
-          -56,
-          -52,
-          -48,
-          -44,
-          -40,
-          -36,
-          -32,
-          -28,
-          -24,
-          -20,
-          -16,
-          -12,
-          -8,
-          -4,
-          0,
-          4,
-          8,
-          12,
-          16,
-          20,
-          24,
-          28,
-          32,
-          36,
-          40,
-          44,
-          48,
-          52,
-          56,
-          60,
-          64,
-          68,
-          72,
-          76,
-          80,
-          84,
-          88,
-          92,
-          96,
-          100,
-          104,
-          108,
-          112,
-          114,
-          118,
-          122,
-          126,
-          130,
-          134,
-          138,
-          142,
-          146,
-          150
-        ]
-      }
-    }
-  },
-  bulk_shear_speed_upper: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      kts: {
-        colormap: [
-          20,
-          "#99ffff",
-          40,
-          "#7733cc",
-          50,
-          "#ff66cc",
-          60,
-          "#ff3377",
-          70,
-          "#993399",
-          80,
-          "#ff3333",
-          90,
-          "#cc0000",
-          100,
-          "#ff9900",
-          120,
-          "#ffdd00",
-          140,
-          "#ff8800"
-        ],
-        breakpoints: [
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          110,
-          120,
-          130,
-          140,
-          150,
-          160,
-          170,
-          180
-        ]
-      },
-      "m/s": {
-        colormap: [
-          10,
-          "#99ffff",
-          22,
-          "#7733cc",
-          26,
-          "#ff66cc",
-          30,
-          "#ff3377",
-          38,
-          "#993399",
-          42,
-          "#ff3333",
-          46,
-          "#cc0000",
-          50,
-          "#ff9900",
-          62,
-          "#ffdd00",
-          70,
-          "#ff8800"
-        ],
-        breakpoints: [
-          10,
-          14,
-          18,
-          22,
-          26,
-          30,
-          34,
-          38,
-          42,
-          46,
-          50,
-          54,
-          58,
-          62,
-          66,
-          70,
-          74,
-          78,
-          82,
-          86,
-          90
-        ]
-      }
-    }
-  },
-  bulk_shear_speed_lower: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      kts: {
-        colormap: [
-          10,
-          "#99ffff",
-          20,
-          "#ff66cc",
-          30,
-          "#ff3377",
-          40,
-          "#993399",
-          50,
-          "#ff3333",
-          60,
-          "#ff9900",
-          70,
-          "#ffdd00",
-          80,
-          "#ff8800"
-        ],
-        breakpoints: [
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90
-        ]
-      },
-      "m/s": {
-        colormap: [
-          5,
-          "#99ffff",
-          11,
-          "#ff66cc",
-          15,
-          "#ff3377",
-          21,
-          "#993399",
-          25,
-          "#ff3333",
-          31,
-          "#ff9900",
-          35,
-          "#ffdd00",
-          41,
-          "#ff8800"
-        ],
-        breakpoints: [
-          5,
-          7,
-          9,
-          11,
-          13,
-          15,
-          17,
-          19,
-          21,
-          23,
-          25,
-          27,
-          29,
-          31,
-          33,
-          35,
-          37,
-          39,
-          41,
-          43,
-          45
-        ]
-      }
-    }
-  },
-  hlcy: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "m²/s²": {
-        colormap: [
-          -1e3,
-          "#33007a",
-          0,
-          "#dddddd",
-          50,
-          "#888888",
-          100,
-          "#3377cc",
-          150,
-          "#66bbff",
-          200,
-          "#ffdd00",
-          300,
-          "#ffcc00",
-          350,
-          "#ff0000",
-          400,
-          "#cc0066",
-          450,
-          "#8800cc",
-          500,
-          "#cc66ff",
-          600,
-          "#ffbbbb",
-          1500,
-          "#ff8800"
-        ],
-        breakpoints: [
-          -1500,
-          -1450,
-          -1400,
-          -1350,
-          -1300,
-          -1250,
-          -1200,
-          -1150,
-          -1100,
-          -1050,
-          -1e3,
-          -950,
-          -900,
-          -850,
-          -800,
-          -750,
-          -700,
-          -650,
-          -600,
-          -550,
-          -500,
-          -450,
-          -400,
-          -350,
-          -300,
-          -250,
-          -200,
-          -150,
-          -100,
-          -50,
-          0,
-          50,
-          100,
-          150,
-          200,
-          250,
-          300,
-          350,
-          400,
-          450,
-          500,
-          550,
-          600,
-          650,
-          700,
-          750,
-          800,
-          850,
-          900,
-          950,
-          1e3,
-          1050,
-          1100,
-          1150,
-          1200,
-          1250,
-          1300,
-          1350,
-          1400,
-          1450,
-          1500
-        ]
-      }
-    }
-  },
-  mxuphl_5000: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "m²/s²": {
-        colormap: [
-          2,
-          "#99ffff",
-          90,
-          "#0077ff",
-          100,
-          "#ffee00",
-          200,
-          "#ff66ff",
-          400,
-          "#8800ee"
-        ],
-        breakpoints: [
-          2,
-          5,
-          10,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          240,
-          260,
-          280,
-          300,
-          320,
-          340,
-          360,
-          380,
-          400,
-          440,
-          480,
-          520,
-          560
-        ]
-      }
-    }
-  },
-  mxuphl_3000: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "m²/s²": {
-        colormap: [
-          2,
-          "#99ffff",
-          90,
-          "#0077ff",
-          100,
-          "#ffee00",
-          200,
-          "#ff66ff",
-          300,
-          "#8800ee"
-        ],
-        breakpoints: [
-          2,
-          5,
-          10,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          110,
-          120,
-          130,
-          140,
-          150,
-          160,
-          170,
-          180,
-          190,
-          200,
-          220,
-          240,
-          260,
-          280,
-          300
-        ]
-      }
-    }
-  },
-  ehi: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          -20,
-          "#33007a",
-          0,
-          "#dddddd",
-          1,
-          "#3377cc",
-          2,
-          "#ffee00",
-          6,
-          "#cc0066",
-          8,
-          "#8800cc",
-          20,
-          "#ffbbbb"
-        ],
-        breakpoints: [
-          -20,
-          -19.5,
-          -19,
-          -18.5,
-          -18,
-          -17.5,
-          -17,
-          -16.5,
-          -16,
-          -15.5,
-          -15,
-          -14.5,
-          -14,
-          -13.5,
-          -13,
-          -12.5,
-          -12,
-          -11.5,
-          -11,
-          -10.5,
-          -10,
-          -9.5,
-          -9,
-          -8.5,
-          -8,
-          -7.5,
-          -7,
-          -6.5,
-          -6,
-          -5.5,
-          -5,
-          -4.5,
-          -4,
-          -3.5,
-          -3,
-          -2.5,
-          -2,
-          -1.5,
-          -1,
-          -0.5,
-          0,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          6.5,
-          7,
-          7.5,
-          8,
-          8.5,
-          9,
-          9.5,
-          10,
-          10.5,
-          11,
-          11.5,
-          12,
-          12.5,
-          13,
-          13.5,
-          14,
-          14.5,
-          15,
-          15.5,
-          16,
-          16.5,
-          17,
-          17.5,
-          18,
-          18.5,
-          19,
-          19.5,
-          20
-        ]
-      }
-    }
-  },
-  slr: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in. Snow/in. Liquid": {
-        colormap: [
-          1,
-          "#ccffff",
-          7,
-          "#0088ff",
-          9,
-          "#7733cc",
-          10,
-          "#ff66ff",
-          15,
-          "#ffcc99",
-          50,
-          "#ff8800"
-        ],
-        breakpoints: [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          31,
-          32,
-          33,
-          34,
-          35,
-          36,
-          37,
-          38,
-          39,
-          40,
-          41,
-          42,
-          43,
-          44,
-          45,
-          46,
-          47,
-          48,
-          49,
-          50
-        ]
-      }
-    }
-  },
-  "2t_2": {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "°F": {
-        colormap: [
-          -90,
-          "#FFFFFF",
-          -60,
-          "#d9c2ff",
-          -30,
-          "#cc0088",
-          0,
-          "#8822ee",
-          32,
-          "#0077ff",
-          33,
-          "#00cccc",
-          50,
-          "#00dd66",
-          60,
-          "#ffbb00",
-          80,
-          "#ff5500",
-          100,
-          "#ff0066",
-          120,
-          "#cc0088",
-          150,
-          "#FFFFFF"
-        ],
-        breakpoints: [
-          -90,
-          -88,
-          -86,
-          -84,
-          -82,
-          -80,
-          -78,
-          -76,
-          -74,
-          -72,
-          -70,
-          -68,
-          -66,
-          -64,
-          -62,
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60,
-          62,
-          64,
-          66,
-          68,
-          70,
-          72,
-          74,
-          76,
-          78,
-          80,
-          82,
-          84,
-          86,
-          88,
-          90,
-          92,
-          94,
-          96,
-          98,
-          100,
-          102,
-          104,
-          106,
-          108,
-          110,
-          112,
-          114,
-          116,
-          118,
-          120,
-          122,
-          124,
-          126,
-          128,
-          130,
-          132,
-          134,
-          136,
-          138,
-          140,
-          142,
-          144,
-          146,
-          148,
-          150
-        ]
-      },
-      "°C": {
-        colormap: [
-          -70,
-          "#FFFFFF",
-          -40,
-          "#d9c2ff",
-          -31,
-          "#cc0088",
-          -13,
-          "#8822ee",
-          0,
-          "#0077ff",
-          1,
-          "#00cccc",
-          10,
-          "#00dd66",
-          15,
-          "#ffbb00",
-          25,
-          "#ff5500",
-          40,
-          "#ff0066",
-          50,
-          "#cc0088",
-          70,
-          "#FFFFFF"
-        ],
-        breakpoints: [
-          -70,
-          -68,
-          -66,
-          -64,
-          -62,
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60,
-          62,
-          64,
-          66,
-          68,
-          70
-        ]
-      }
-    }
-  },
-  t_iso: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°C": {
-        colormap: [0, "#0033ff"],
-        breakpoints: [0]
-      }
-    }
-  },
-  "2d_2": {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°F": {
-        colormap: [
-          -80,
-          "#ff0000",
-          -60,
-          "#ff5500",
-          -20,
-          "#ffaa00",
-          32,
-          "#dddddd",
-          33,
-          "#66dd88",
-          50,
-          "#00cc66",
-          60,
-          "#0077ff",
-          80,
-          "#66aaff",
-          90,
-          "#ffffff"
-        ],
-        breakpoints: [
-          -80,
-          -78,
-          -76,
-          -74,
-          -72,
-          -70,
-          -68,
-          -66,
-          -64,
-          -62,
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60,
-          62,
-          64,
-          66,
-          68,
-          70,
-          72,
-          74,
-          76,
-          78,
-          80,
-          82,
-          84,
-          86,
-          88,
-          90
-        ]
-      },
-      "°C": {
-        colormap: [
-          -70,
-          "#ff0000",
-          -50,
-          "#ff5500",
-          -30,
-          "#ffaa00",
-          0,
-          "#dddddd",
-          1,
-          "#66dd88",
-          10,
-          "#00cc66",
-          20,
-          "#0077ff",
-          30,
-          "#66aaff",
-          40,
-          "#ffffff"
-        ],
-        breakpoints: [
-          -70,
-          -68,
-          -66,
-          -64,
-          -62,
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50
-        ]
-      }
-    }
-  },
-  d: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°C": {
-        colormap: [
-          -70,
-          "#FFFFFF",
-          -40,
-          "#d9c2ff",
-          -31,
-          "#cc0088",
-          -13,
-          "#8822ee",
-          0,
-          "#0077ff",
-          1,
-          "#00cccc",
-          10,
-          "#00dd66",
-          15,
-          "#ffbb00",
-          25,
-          "#ff5500",
-          40,
-          "#ff0066",
-          50,
-          "#cc0088",
-          70,
-          "#FFFFFF"
-        ],
-        breakpoints: [
-          -70,
-          -68,
-          -66,
-          -64,
-          -62,
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60,
-          62,
-          64,
-          66,
-          68,
-          70
-        ]
-      }
-    }
-  },
-  t: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "°C": {
-        colormap: [
-          -50,
-          "#ffffff",
-          -35,
-          "#cc0088",
-          -20,
-          "#8822ee",
-          0,
-          "#0077ff",
-          1,
-          "#00cccc",
-          10,
-          "#00dd66",
-          15,
-          "#ffbb00",
-          25,
-          "#ff5500",
-          40,
-          "#ff0066",
-          50,
-          "#cc0088"
-        ],
-        breakpoints: [
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50
-        ]
-      }
-    }
-  },
-  wind_speed_10: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      kts: {
-        colormap: [
-          5,
-          "#dddddd",
-          10,
-          "#99ccff",
-          15,
-          "#0088ff",
-          35,
-          "#8822ee",
-          50,
-          "#ff0088",
-          70,
-          "#ff8800",
-          120,
-          "#ffff00"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150
-        ]
-      },
-      mph: {
-        colormap: [
-          5,
-          "#dddddd",
-          10,
-          "#99ccff",
-          20,
-          "#0088ff",
-          40,
-          "#8822ee",
-          55,
-          "#ff0088",
-          80,
-          "#ff8800",
-          150,
-          "#ffff00"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150,
-          155,
-          160,
-          165,
-          170,
-          175,
-          180,
-          185,
-          190,
-          195,
-          200
-        ]
-      },
-      "m/s": {
-        colormap: [
-          2,
-          "#dddddd",
-          10,
-          "#0088ff",
-          20,
-          "#8822ee",
-          24,
-          "#ff0088",
-          36,
-          "#ff8800",
-          60,
-          "#ffff00"
-        ],
-        breakpoints: [
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60,
-          62,
-          64,
-          66,
-          68,
-          70,
-          72,
-          74,
-          76,
-          78,
-          80
-        ]
-      },
-      "km/h": {
-        colormap: [
-          10,
-          "#dddddd",
-          20,
-          "#99ccff",
-          35,
-          "#0088ff",
-          70,
-          "#8822ee",
-          90,
-          "#ff0088",
-          130,
-          "#ff8800",
-          220,
-          "#ffff00"
-        ],
-        breakpoints: [
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150,
-          155,
-          160,
-          165,
-          170,
-          175,
-          180,
-          185,
-          190,
-          195,
-          200,
-          205,
-          210,
-          215,
-          220,
-          225,
-          230,
-          235,
-          240,
-          245,
-          250,
-          255,
-          260,
-          265,
-          270,
-          275,
-          280,
-          285,
-          290,
-          295,
-          300
-        ]
-      }
-    }
-  },
-  wind_speed_upper: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      kts: {
-        colormap: [
-          50,
-          "#99ffff",
-          60,
-          "#00cccc",
-          70,
-          "#00dd66",
-          90,
-          "#ffee00",
-          120,
-          "#ff9900",
-          130,
-          "#ff3333",
-          140,
-          "#9933cc",
-          180,
-          "#ff99ff",
-          200,
-          "#ff6666",
-          250,
-          "#ff0000"
-        ],
-        breakpoints: [
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          110,
-          120,
-          130,
-          140,
-          150,
-          160,
-          170,
-          180,
-          190,
-          200,
-          210,
-          220,
-          230,
-          240,
-          250
-        ]
-      },
-      mph: {
-        colormap: [
-          55,
-          "#99ffff",
-          70,
-          "#00cccc",
-          80,
-          "#00dd66",
-          105,
-          "#ffee00",
-          140,
-          "#ff9900",
-          150,
-          "#ff3333",
-          160,
-          "#9933cc",
-          205,
-          "#ff99ff",
-          230,
-          "#ff6666",
-          290,
-          "#ff0000"
-        ],
-        breakpoints: [
-          10,
-          25,
-          35,
-          45,
-          55,
-          70,
-          80,
-          90,
-          105,
-          115,
-          125,
-          140,
-          150,
-          160,
-          170,
-          185,
-          195,
-          205,
-          220,
-          230,
-          240,
-          255,
-          265,
-          275,
-          290
-        ]
-      },
-      "m/s": {
-        colormap: [
-          25,
-          "#99ffff",
-          30,
-          "#00cccc",
-          36,
-          "#00dd66",
-          46,
-          "#ffee00",
-          62,
-          "#ff9900",
-          67,
-          "#ff3333",
-          72,
-          "#9933cc",
-          93,
-          "#ff99ff",
-          103,
-          "#ff6666",
-          129,
-          "#ff0000"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          36,
-          41,
-          46,
-          51,
-          57,
-          62,
-          67,
-          72,
-          77,
-          82,
-          88,
-          93,
-          98,
-          103,
-          108,
-          113,
-          118,
-          124,
-          129
-        ]
-      },
-      "km/h": {
-        colormap: [
-          95,
-          "#99ffff",
-          110,
-          "#00cccc",
-          130,
-          "#00dd66",
-          165,
-          "#ffee00",
-          220,
-          "#ff9900",
-          240,
-          "#ff3333",
-          260,
-          "#9933cc",
-          335,
-          "#ff99ff",
-          370,
-          "#ff6666",
-          460,
-          "#ff0000"
-        ],
-        breakpoints: [
-          20,
-          35,
-          55,
-          75,
-          95,
-          110,
-          130,
-          150,
-          165,
-          185,
-          205,
-          220,
-          240,
-          260,
-          280,
-          295,
-          315,
-          335,
-          350,
-          370,
-          390,
-          410,
-          425,
-          445,
-          460
-        ]
-      }
-    }
-  },
-  wind_speed_mid: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      kts: {
-        colormap: [
-          10,
-          "#ccddee",
-          20,
-          "#99ffff",
-          30,
-          "#00cccc",
-          35,
-          "#00dd66",
-          45,
-          "#ffee00",
-          55,
-          "#ff9900",
-          65,
-          "#9933cc",
-          100,
-          "#ff99ff",
-          120,
-          "#ff6666",
-          155,
-          "#ff0000"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150,
-          155,
-          160,
-          165,
-          170,
-          175,
-          180,
-          185,
-          190,
-          195,
-          200,
-          205,
-          210,
-          215,
-          220,
-          225,
-          230,
-          235,
-          240,
-          245,
-          250
-        ]
-      },
-      mph: {
-        colormap: [
-          10,
-          "#ccddee",
-          25,
-          "#99ffff",
-          35,
-          "#00cccc",
-          40,
-          "#00dd66",
-          50,
-          "#ffee00",
-          65,
-          "#ff9900",
-          75,
-          "#9933cc",
-          115,
-          "#ff99ff",
-          140,
-          "#ff6666",
-          180,
-          "#ff0000"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          140,
-          145,
-          150,
-          155,
-          160,
-          165,
-          170,
-          180,
-          185,
-          190,
-          195,
-          200,
-          205,
-          210,
-          220,
-          225,
-          230,
-          235,
-          240,
-          245,
-          250,
-          260,
-          265,
-          270,
-          275,
-          280,
-          285,
-          290
-        ]
-      },
-      "m/s": {
-        colormap: [
-          5,
-          "#ccddee",
-          10,
-          "#99ffff",
-          15,
-          "#00cccc",
-          18,
-          "#00dd66",
-          23,
-          "#ffee00",
-          28,
-          "#ff9900",
-          33,
-          "#9933cc",
-          51,
-          "#ff99ff",
-          62,
-          "#ff6666",
-          80,
-          "#ff0000"
-        ],
-        breakpoints: [
-          2,
-          5,
-          8,
-          10,
-          13,
-          15,
-          18,
-          20,
-          23,
-          26,
-          28,
-          31,
-          33,
-          36,
-          38,
-          41,
-          44,
-          46,
-          49,
-          51,
-          54,
-          57,
-          59,
-          62,
-          64,
-          67,
-          69,
-          72,
-          74,
-          77,
-          80,
-          82,
-          85,
-          87,
-          90,
-          92,
-          95,
-          97,
-          100,
-          103,
-          105,
-          108,
-          110,
-          113,
-          115,
-          118,
-          120,
-          123,
-          125,
-          128
-        ]
-      },
-      "km/h": {
-        colormap: [
-          20,
-          "#ccddee",
-          35,
-          "#99ffff",
-          55,
-          "#00cccc",
-          65,
-          "#00dd66",
-          85,
-          "#ffee00",
-          100,
-          "#ff9900",
-          120,
-          "#9933cc",
-          185,
-          "#ff99ff",
-          220,
-          "#ff6666",
-          290,
-          "#ff0000"
-        ],
-        breakpoints: [
-          10,
-          20,
-          25,
-          35,
-          45,
-          55,
-          65,
-          75,
-          85,
-          95,
-          100,
-          110,
-          120,
-          130,
-          140,
-          150,
-          160,
-          165,
-          175,
-          185,
-          195,
-          205,
-          210,
-          220,
-          230,
-          240,
-          250,
-          260,
-          270,
-          280,
-          290,
-          300,
-          310,
-          315,
-          325,
-          335,
-          345,
-          355,
-          365,
-          370,
-          380,
-          390,
-          395,
-          405,
-          415,
-          425,
-          435,
-          445,
-          455,
-          465
-        ]
-      }
-    }
-  },
-  pwat_0: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      mm: {
-        colormap: [
-          0,
-          "#ff5500",
-          10,
-          "#ff9933",
-          25,
-          "#ffcc99",
-          35,
-          "#cc99ff",
-          55,
-          "#8866ff",
-          65,
-          "#5555ff",
-          75,
-          "#3333aa"
-        ],
-        breakpoints: [
-          1,
-          3,
-          5,
-          7,
-          9,
-          11,
-          13,
-          15,
-          17,
-          19,
-          21,
-          23,
-          25,
-          27,
-          29,
-          31,
-          33,
-          35,
-          37,
-          39,
-          41,
-          43,
-          45,
-          47,
-          49,
-          51,
-          53,
-          55,
-          57,
-          59,
-          61,
-          63,
-          65,
-          67,
-          69,
-          71,
-          73,
-          75,
-          77,
-          79,
-          81,
-          83,
-          85,
-          87,
-          89
-        ]
-      },
-      in: {
-        colormap: [
-          0,
-          "#ff5500",
-          0.5,
-          "#ff9933",
-          1,
-          "#ffcc99",
-          1.5,
-          "#cc99ff",
-          2,
-          "#8866ff",
-          2.5,
-          "#5555ff",
-          3,
-          "#3333aa"
-        ],
-        breakpoints: [
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.25,
-          2.5,
-          2.75,
-          3,
-          3.25,
-          3.5,
-          3.75,
-          4
-        ]
-      }
-    }
-  },
-  thetaE: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "°K": {
-        colormap: [
-          230,
-          "#995522",
-          300,
-          "#ffbb77",
-          320,
-          "#99ff66",
-          325,
-          "#33cc00",
-          330,
-          "#00eeff",
-          335,
-          "#0099aa",
-          340,
-          "#8800ff",
-          355,
-          "#ff0000",
-          360,
-          "#ff0088",
-          370,
-          "#ffaaaa"
-        ],
-        breakpoints: [
-          230,
-          235,
-          240,
-          245,
-          250,
-          255,
-          260,
-          265,
-          270,
-          275,
-          280,
-          285,
-          290,
-          295,
-          300,
-          305,
-          310,
-          315,
-          320,
-          325,
-          330,
-          335,
-          340,
-          345,
-          350,
-          355,
-          360,
-          365,
-          370
-        ]
-      }
-    }
-  },
-  gust_0: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      mph: {
-        colormap: [
-          20,
-          "#6699ff",
-          30,
-          "#00ffff",
-          35,
-          "#00cc33",
-          45,
-          "#99ff66",
-          50,
-          "#ffdd00",
-          65,
-          "#ff0000",
-          70,
-          "#cc6600",
-          85,
-          "#ffbbbb",
-          100,
-          "#ff3333",
-          120,
-          "#ff8800",
-          200,
-          "#999999"
-        ],
-        breakpoints: [
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150,
-          155,
-          160,
-          165,
-          170,
-          175,
-          180,
-          185,
-          190,
-          195,
-          200
-        ]
-      },
-      kts: {
-        colormap: [
-          15,
-          "#6699ff",
-          25,
-          "#00ffff",
-          30,
-          "#00cc33",
-          40,
-          "#99ff66",
-          50,
-          "#ffdd00",
-          55,
-          "#ff0000",
-          60,
-          "#cc6600",
-          70,
-          "#ffbbbb",
-          90,
-          "#ff3333",
-          100,
-          "#ff8800",
-          150,
-          "#999999"
-        ],
-        breakpoints: [
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150
-        ]
-      },
-      "m/s": {
-        colormap: [
-          10,
-          "#6699ff",
-          14,
-          "#00ffff",
-          16,
-          "#00cc33",
-          20,
-          "#99ff66",
-          24,
-          "#ffdd00",
-          30,
-          "#ff0000",
-          32,
-          "#cc6600",
-          38,
-          "#ffbbbb",
-          44,
-          "#ff3333",
-          52,
-          "#ff8800",
-          80,
-          "#999999"
-        ],
-        breakpoints: [
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60,
-          62,
-          64,
-          66,
-          68,
-          70,
-          72,
-          74,
-          76,
-          78,
-          80
-        ]
-      },
-      "km/h": {
-        colormap: [
-          30,
-          "#6699ff",
-          50,
-          "#00ffff",
-          55,
-          "#00cc33",
-          70,
-          "#99ff66",
-          80,
-          "#ffdd00",
-          105,
-          "#ff0000",
-          115,
-          "#cc6600",
-          135,
-          "#ffbbbb",
-          160,
-          "#ff3333",
-          195,
-          "#ff8800",
-          320,
-          "#999999"
-        ],
-        breakpoints: [
-          30,
-          40,
-          50,
-          55,
-          65,
-          70,
-          80,
-          90,
-          95,
-          105,
-          115,
-          120,
-          130,
-          135,
-          145,
-          150,
-          160,
-          170,
-          175,
-          185,
-          195,
-          200,
-          210,
-          215,
-          225,
-          235,
-          240,
-          250,
-          255,
-          265,
-          270,
-          280,
-          290,
-          295,
-          305,
-          315,
-          320
-        ]
-      }
-    }
-  },
-  ltng: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "flashes km⁻²/5 min": {
-        colormap: [
-          0.01,
-          "#dddddd",
-          0.75,
-          "#ffff00",
-          1,
-          "#ff9999",
-          2,
-          "#ff66bb",
-          3,
-          "#cc66cc",
-          5,
-          "#ff66ff",
-          6,
-          "#cc66ff",
-          15,
-          "#ff3399",
-          21,
-          "#ff9933"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          17,
-          19,
-          21
-        ]
-      }
-    }
-  },
-  cape_0: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "J kg⁻¹": {
-        colormap: [
-          100,
-          "#4dbb6a",
-          250,
-          "#4dbb6a",
-          1e3,
-          "#ffca3a",
-          2e3,
-          "#ff9a3c",
-          3e3,
-          "#ff5e7d",
-          6e3,
-          "#9c3fe4"
-        ],
-        breakpoints: [
-          100,
-          250,
-          500,
-          750,
-          1e3,
-          1250,
-          1500,
-          1750,
-          2e3,
-          2250,
-          2500,
-          2750,
-          3e3,
-          3250,
-          3500,
-          3750,
-          4e3,
-          4250,
-          4500,
-          4750,
-          5e3,
-          5250,
-          5500,
-          5750,
-          6e3,
-          6250,
-          6500,
-          6750,
-          7e3,
-          7250,
-          7500,
-          7750,
-          8e3,
-          8250,
-          8500,
-          8750,
-          9e3,
-          9250,
-          9500,
-          9750,
-          1e4
-        ]
-      }
-    }
-  },
-  "cape_0-3000": {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "J kg⁻¹": {
-        colormap: [
-          5,
-          "#4dbb6a",
-          100,
-          "#ffca3a",
-          200,
-          "#ff9a3c",
-          300,
-          "#ff5e7d",
-          500,
-          "#9c3fe4"
-        ],
-        breakpoints: [
-          5,
-          25,
-          50,
-          75,
-          100,
-          125,
-          150,
-          175,
-          200,
-          225,
-          250,
-          275,
-          300,
-          325,
-          350,
-          375,
-          400,
-          425,
-          450,
-          475,
-          500
-        ]
-      }
-    }
-  },
-  stp: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0.1,
-          "#b3b3b3",
-          1,
-          "#4d80b3",
-          2,
-          "#ffaa00",
-          3,
-          "#ff3366",
-          4,
-          "#cc33ff",
-          5,
-          "#ff66cc",
-          6,
-          "#ff6633",
-          9,
-          "#ffaa66",
-          30,
-          "#00cccc"
-        ],
-        breakpoints: [
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          6.5,
-          7,
-          7.5,
-          8,
-          8.5,
-          9,
-          9.5,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          35,
-          40
-        ]
-      }
-    }
-  },
-  supercellComposite: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0.1,
-          "#b3b3b3",
-          1,
-          "#4d80b3",
-          2,
-          "#ffaa00",
-          3,
-          "#ff3366",
-          4,
-          "#cc33ff",
-          5,
-          "#ff66cc",
-          6,
-          "#ff6633",
-          9,
-          "#ffaa66",
-          20,
-          "#00cccc",
-          50,
-          "white"
-        ],
-        breakpoints: [
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          6.5,
-          7,
-          7.5,
-          8,
-          8.5,
-          9,
-          9.5,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50
-        ]
-      }
-    }
-  },
-  tts: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0.1,
-          "#b3b3b3",
-          1,
-          "#4d80b3",
-          2,
-          "#ffaa00",
-          3,
-          "#ff3366",
-          4,
-          "#cc33ff",
-          5,
-          "#ff66cc",
-          6,
-          "#ff6633",
-          9,
-          "#ffaa66",
-          30,
-          "#00cccc"
-        ],
-        breakpoints: [
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          6.5,
-          7,
-          7.5,
-          8,
-          8.5,
-          9,
-          9.5,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          35,
-          40
-        ]
-      }
-    }
-  },
-  tehi: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0.1,
-          "#b3b3b3",
-          1,
-          "#4d80b3",
-          2,
-          "#ffaa00",
-          3,
-          "#ff3366",
-          4,
-          "#cc33ff",
-          5,
-          "#ff66cc",
-          6,
-          "#ff6633",
-          9,
-          "#ffaa66",
-          30,
-          "#00cccc"
-        ],
-        breakpoints: [
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          6.5,
-          7,
-          7.5,
-          8,
-          8.5,
-          9,
-          9.5,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          35,
-          40
-        ]
-      }
-    }
-  },
-  lftx_0: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "°C": {
-        colormap: [
-          -20,
-          "#ffb3b3",
-          -14,
-          "#ff3300",
-          -13,
-          "#cc0000",
-          -12,
-          "#ff6699",
-          -10,
-          "#ff99ff",
-          -9,
-          "#cc66ff",
-          -8,
-          "#9933ff",
-          -7,
-          "#cc0055",
-          -6,
-          "#ff0044",
-          -4,
-          "#ffaa00",
-          -3,
-          "#ffff00",
-          -2,
-          "#6699ff",
-          -1,
-          "#0066cc"
-        ],
-        breakpoints: [
-          -20,
-          -19,
-          -18,
-          -17,
-          -16,
-          -15,
-          -14,
-          -13,
-          -12,
-          -11,
-          -10,
-          -9,
-          -8,
-          -7,
-          -6,
-          -5,
-          -4,
-          -3,
-          -2,
-          -1
-        ]
-      }
-    }
-  },
-  lapse_rates_500700: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "°C km⁻¹": {
-        colormap: [
-          1,
-          "#cccccc",
-          5,
-          "#666666",
-          6,
-          "#3366cc",
-          7,
-          "#ffff00",
-          8,
-          "#ff9900",
-          9,
-          "#cc33ff",
-          10,
-          "#ff99ff",
-          15,
-          "#cc0000"
-        ],
-        breakpoints: [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15
-        ]
-      }
-    }
-  },
-  lcl: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      m: {
-        colormap: [
-          100,
-          "#cccccc",
-          1e3,
-          "#ffcc66",
-          2e3,
-          "#ff6633",
-          3e3,
-          "#cc0033",
-          4e3,
-          "#660033",
-          9e3,
-          "#ccccff"
-        ],
-        breakpoints: [
-          100,
-          200,
-          300,
-          400,
-          500,
-          600,
-          700,
-          800,
-          900,
-          1e3,
-          1100,
-          1200,
-          1300,
-          1400,
-          1500,
-          1600,
-          1700,
-          1800,
-          1900,
-          2e3,
-          2100,
-          2200,
-          2300,
-          2400,
-          2500,
-          2600,
-          2700,
-          2800,
-          2900,
-          3e3,
-          3100,
-          3200,
-          3300,
-          3400,
-          3500,
-          3600,
-          3700,
-          3800,
-          3900,
-          4e3,
-          4100,
-          4200,
-          4300,
-          4400,
-          4500,
-          4600,
-          4700,
-          4800,
-          4900,
-          5e3,
-          5100,
-          5200,
-          5300,
-          5400,
-          5500,
-          5600,
-          5700,
-          5800,
-          5900,
-          6e3,
-          6100,
-          6200,
-          6300,
-          6400,
-          6500,
-          6600,
-          6700,
-          6800,
-          6900,
-          7e3,
-          7100,
-          7200,
-          7300,
-          7400,
-          7500,
-          7600,
-          7700,
-          7800,
-          7900,
-          8e3,
-          8100,
-          8200,
-          8300,
-          8400,
-          8500,
-          8600,
-          8700,
-          8800,
-          8900,
-          9e3,
-          9100,
-          9200,
-          9300,
-          9400,
-          9500,
-          9600,
-          9700,
-          9800,
-          9900,
-          1e4
-        ]
-      },
-      km: {
-        colormap: [
-          0.1,
-          "#cccccc",
-          1,
-          "#ffcc66",
-          2,
-          "#ff6633",
-          3,
-          "#cc0033",
-          4,
-          "#660033",
-          9,
-          "#ccccff"
-        ],
-        breakpoints: [
-          0.1,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.1,
-          1.2,
-          1.3,
-          1.4,
-          1.5,
-          1.6,
-          1.7,
-          1.8,
-          1.9,
-          2,
-          2.1,
-          2.2,
-          2.3,
-          2.4,
-          2.5,
-          2.6,
-          2.7,
-          2.8,
-          2.9,
-          3,
-          3.1,
-          3.2,
-          3.3,
-          3.4,
-          3.5,
-          3.6,
-          3.7,
-          3.8,
-          3.9,
-          4,
-          4.1,
-          4.2,
-          4.3,
-          4.4,
-          4.5,
-          4.6,
-          4.7,
-          4.8,
-          4.9,
-          5,
-          5.1,
-          5.2,
-          5.3,
-          5.4,
-          5.5,
-          5.6,
-          5.7,
-          5.8,
-          5.9,
-          6,
-          6.1,
-          6.2,
-          6.3,
-          6.4,
-          6.5,
-          6.6,
-          6.7,
-          6.8,
-          6.9,
-          7,
-          7.1,
-          7.2,
-          7.3,
-          7.4,
-          7.5,
-          7.6,
-          7.7,
-          7.8,
-          7.9,
-          8,
-          8.1,
-          8.2,
-          8.3,
-          8.4,
-          8.5,
-          8.6,
-          8.7,
-          8.8,
-          8.9,
-          9,
-          9.1,
-          9.2,
-          9.3,
-          9.4,
-          9.5,
-          9.6,
-          9.7,
-          9.8,
-          9.9,
-          10
-        ]
-      },
-      ft: {
-        colormap: [
-          500,
-          "#cccccc",
-          3e3,
-          "#ffcc66",
-          6500,
-          "#ff6633",
-          1e4,
-          "#cc0033",
-          13e3,
-          "#660033",
-          3e4,
-          "#ccccff"
-        ],
-        breakpoints: [
-          500,
-          1e3,
-          1500,
-          2e3,
-          2500,
-          3e3,
-          3500,
-          4e3,
-          4500,
-          5e3,
-          5500,
-          6e3,
-          6500,
-          7e3,
-          7500,
-          8e3,
-          8500,
-          9e3,
-          9500,
-          1e4,
-          10500,
-          11e3,
-          11500,
-          12e3,
-          12500,
-          13e3,
-          13500,
-          14e3,
-          14500,
-          15e3,
-          15500,
-          16e3,
-          16500,
-          17e3,
-          17500,
-          18e3,
-          18500,
-          19e3,
-          19500,
-          2e4,
-          20500,
-          21e3,
-          21500,
-          22e3,
-          22500,
-          23e3,
-          23500,
-          24e3,
-          24500,
-          25e3,
-          25500,
-          26e3,
-          26500,
-          27e3,
-          27500,
-          28e3,
-          28500,
-          29e3,
-          29500,
-          3e4
-        ]
-      }
-    }
-  },
-  cin_0: {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "J kg⁻¹": {
-        colormap: [
-          -1e3,
-          "#cccccc",
-          -600,
-          "#ff9900",
-          -400,
-          "#ff99ff",
-          -300,
-          "#cc66ff",
-          -200,
-          "#cc6699",
-          -50,
-          "#ffdd00"
-        ],
-        breakpoints: [
-          -1e3,
-          -950,
-          -900,
-          -850,
-          -800,
-          -750,
-          -700,
-          -650,
-          -600,
-          -550,
-          -500,
-          -450,
-          -400,
-          -350,
-          -300,
-          -250,
-          -200,
-          -150,
-          -100,
-          -50
-        ]
-      }
-    }
-  },
-  dgzrh: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#5555dd",
-          25,
-          "#ff9999",
-          50,
-          "#ffcc33",
-          75,
-          "#33cc66",
-          100,
-          "#3399ff"
-        ],
-        breakpoints: [
-          0,
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100
-        ]
-      }
-    }
-  },
-  "2r_2": {
-    type: "fill",
-    gridded: !0,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#444444",
-          25,
-          "#ff6655",
-          50,
-          "#ffcc00",
-          75,
-          "#33cc77",
-          100,
-          "#3399ff"
-        ],
-        breakpoints: [
-          0,
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100
-        ]
-      }
-    }
-  },
-  r: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#444444",
-          25,
-          "#ff6655",
-          50,
-          "#ffcc00",
-          75,
-          "#33cc77",
-          100,
-          "#3399ff"
-        ],
-        breakpoints: [
-          0,
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100
-        ]
-      }
-    }
-  },
-  mean700300mbRH: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#444444",
-          25,
-          "#ff6655",
-          50,
-          "#ffcc00",
-          75,
-          "#33cc77",
-          100,
-          "#3399ff"
-        ],
-        breakpoints: [
-          0,
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100
-        ]
-      }
-    }
-  },
-  fgen: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°C/100km/3hr": {
-        colormap: [
-          1,
-          "#cc66ff",
-          10,
-          "#ff66ff",
-          20,
-          "#3333ff"
-        ],
-        breakpoints: [
-          1,
-          3,
-          5,
-          7,
-          9,
-          11,
-          12,
-          13,
-          15,
-          17,
-          19,
-          21,
-          23,
-          25,
-          27,
-          29,
-          31,
-          33,
-          35,
-          37,
-          39,
-          41,
-          43,
-          45,
-          47,
-          49,
-          51,
-          53,
-          55,
-          57,
-          59,
-          61
-        ]
-      }
-    }
-  },
-  tadv: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°C h⁻¹": {
-        colormap: [
-          -20,
-          "#6699ff",
-          -10,
-          "#ccffff",
-          -8,
-          "#ff99ff",
-          -6,
-          "#ff66cc",
-          -4,
-          "#cc66ff",
-          -2,
-          "#66ccff",
-          -1,
-          "#ffffff",
-          1,
-          "#ffffff",
-          2,
-          "#ffcc66",
-          4,
-          "#ff9933",
-          6,
-          "#ff3333",
-          8,
-          "#cccc00",
-          10,
-          "#ddcc66",
-          20,
-          "#cc9933"
-        ],
-        breakpoints: [
-          -20,
-          -19,
-          -18,
-          -17,
-          -16,
-          -15,
-          -14,
-          -13,
-          -12,
-          -11,
-          -10,
-          -9,
-          -8,
-          -7,
-          -6,
-          -5,
-          -4,
-          -3,
-          -2,
-          -1,
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20
-        ]
-      }
-    }
-  },
-  ivt: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "kg m⁻¹ s⁻¹": {
-        colormap: [
-          250,
-          "#ffbb00",
-          800,
-          "#ff6666",
-          1600,
-          "#9933cc"
-        ],
-        breakpoints: [
-          250,
-          300,
-          350,
-          400,
-          450,
-          500,
-          550,
-          600,
-          650,
-          700,
-          750,
-          800,
-          850,
-          900,
-          950,
-          1e3,
-          1050,
-          1100,
-          1150,
-          1200,
-          1250,
-          1300,
-          1350,
-          1400,
-          1450,
-          1500,
-          1550,
-          1600,
-          1650,
-          1700,
-          1750,
-          1800,
-          1850,
-          1900,
-          1950,
-          2e3,
-          2050,
-          2100
-        ]
-      }
-    }
-  },
-  dgzvvel: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "Pa/s": {
-        colormap: [
-          -80,
-          "#00ccff",
-          -40,
-          "#3333aa",
-          -25,
-          "#ff66cc",
-          -10,
-          "#ff7777",
-          -2,
-          "#ffee00",
-          0,
-          "#cccccc",
-          50,
-          "#333333"
-        ],
-        breakpoints: [
-          -100,
-          -95,
-          -90,
-          -85,
-          -80,
-          -75,
-          -70,
-          -65,
-          -60,
-          -55,
-          -50,
-          -45,
-          -40,
-          -35,
-          -30,
-          -25,
-          -20,
-          -15,
-          -10,
-          -5,
-          0,
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100
-        ]
-      }
-    }
-  },
-  w: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "Pa/s": {
-        colormap: [
-          -150,
-          "#00ccff",
-          -50,
-          "#3333aa",
-          -35,
-          "#ff66cc",
-          -20,
-          "#ff7777",
-          -5,
-          "#ffee00",
-          0,
-          "#cccccc",
-          50,
-          "#333333",
-          150,
-          "white"
-        ],
-        breakpoints: [
-          -150,
-          -145,
-          -140,
-          -135,
-          -130,
-          -125,
-          -120,
-          -115,
-          -110,
-          -105,
-          -100,
-          -95,
-          -90,
-          -85,
-          -80,
-          -75,
-          -70,
-          -65,
-          -60,
-          -55,
-          -50,
-          -45,
-          -40,
-          -35,
-          -30,
-          -25,
-          -20,
-          -15,
-          -10,
-          -5,
-          0,
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80,
-          85,
-          90,
-          95,
-          100,
-          105,
-          110,
-          115,
-          120,
-          125,
-          130,
-          135,
-          140,
-          145,
-          150
-        ]
-      }
-    }
-  },
-  crain: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0,
-          "#000000",
-          1,
-          "#66cc66"
-        ],
-        breakpoints: []
-      }
-    }
-  },
-  csnow: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0,
-          "#000000",
-          1,
-          "#6699cc"
-        ],
-        breakpoints: []
-      }
-    }
-  },
-  cicep: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0,
-          "#000000",
-          1,
-          "#cc66ee"
-        ],
-        breakpoints: []
-      }
-    }
-  },
-  cfrzr: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      None: {
-        colormap: [
-          0,
-          "#000000",
-          1,
-          "#ff3399"
-        ],
-        breakpoints: []
-      }
-    }
-  },
-  prate: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in/hr": {
-        colormap: [
-          5e-3,
-          "#00cc66",
-          0.1,
-          "#ffff00",
-          0.3,
-          "#ff8800",
-          1,
-          "#ff0000",
-          1.5,
-          "#ff00cc"
-        ],
-        breakpoints: [
-          5e-3,
-          0.01,
-          0.03,
-          0.05,
-          0.07,
-          0.1,
-          0.15,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.5,
-          3
-        ]
-      },
-      "mm/hr": {
-        colormap: [
-          0.1,
-          "#00cc66",
-          3,
-          "#ffff00",
-          7,
-          "#ff8800",
-          24,
-          "#ff0000",
-          36,
-          "#ff00cc"
-        ],
-        breakpoints: [
-          0.1,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          30,
-          36,
-          42
-        ]
-      }
-    }
-  },
-  frzrRate: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in/hr [QPF]": {
-        colormap: [
-          5e-3,
-          "#ff3300",
-          0.1,
-          "#ff33ff",
-          0.6,
-          "#cc99cc"
-        ],
-        breakpoints: [
-          5e-3,
-          0.01,
-          0.03,
-          0.05,
-          0.07,
-          0.1,
-          0.15,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.5,
-          3
-        ]
-      },
-      "mm/hr [QPF]": {
-        colormap: [
-          0.1,
-          "#ff3300",
-          3,
-          "#ff33ff",
-          14,
-          "#cc99cc"
-        ],
-        breakpoints: [
-          0.1,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          30,
-          36
-        ]
-      }
-    }
-  },
-  icepRate: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in/hr [3:1]": {
-        colormap: [
-          5e-3,
-          "#8800cc",
-          0.2,
-          "#aa44dd",
-          0.6,
-          "#cc88dd"
-        ],
-        breakpoints: [
-          5e-3,
-          0.01,
-          0.03,
-          0.05,
-          0.07,
-          0.1,
-          0.15,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.5,
-          3
-        ]
-      },
-      "mm/hr [3:1]": {
-        colormap: [
-          0.1,
-          "#8800cc",
-          6,
-          "#aa44dd",
-          16,
-          "#cc88dd"
-        ],
-        breakpoints: [
-          0.1,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          30,
-          36
-        ]
-      }
-    }
-  },
-  rainRate: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in/hr": {
-        colormap: [
-          5e-3,
-          "#00cc66",
-          0.1,
-          "#ffff00",
-          0.3,
-          "#ff8800",
-          1,
-          "#ff0000",
-          1.5,
-          "#ff00cc"
-        ],
-        breakpoints: [
-          5e-3,
-          0.01,
-          0.03,
-          0.05,
-          0.07,
-          0.1,
-          0.15,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.5,
-          3
-        ]
-      },
-      "mm/hr": {
-        colormap: [
-          0.1,
-          "#00cc66",
-          3,
-          "#ffff00",
-          7,
-          "#ff8800",
-          24,
-          "#ff0000",
-          36,
-          "#ff00cc"
-        ],
-        breakpoints: [
-          0.1,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          30,
-          36,
-          42
-        ]
-      }
-    }
-  },
-  snowRate: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in/hr [10:1]": {
-        colormap: [
-          0.05,
-          "#33ccff",
-          1,
-          "#000099",
-          4,
-          "#ff00cc"
-        ],
-        breakpoints: [
-          0.05,
-          0.1,
-          0.3,
-          0.5,
-          0.7,
-          1,
-          1.5,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          20,
-          25,
-          30
-        ]
-      },
-      "cm/hr [10:1]": {
-        colormap: [
-          0.1,
-          "#33ccff",
-          3,
-          "#000099",
-          10,
-          "#ff00cc"
-        ],
-        breakpoints: [
-          0.1,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          30,
-          36
-        ]
-      }
-    }
-  },
-  frzrRefl: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dBZ: {
-        colormap: [
-          5,
-          "#ff3300",
-          30,
-          "#ffaa33",
-          80,
-          "#cc0066"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80
-        ]
-      }
-    }
-  },
-  icepRefl: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dBZ: {
-        colormap: [
-          5,
-          "#8800cc",
-          70,
-          "#ffbb00",
-          80,
-          "#dddddd"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80
-        ]
-      }
-    }
-  },
-  snowRefl: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dBZ: {
-        colormap: [
-          5,
-          "#33ccff",
-          35,
-          "#8800cc",
-          70,
-          "#ffccff",
-          80,
-          "#dddddd"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80
-        ]
-      }
-    }
-  },
-  rainRefl: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dBZ: {
-        colormap: [
-          5,
-          "#00cc66",
-          35,
-          "#ffff00",
-          70,
-          "#ff8800",
-          80,
-          "#ff0000"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          65,
-          70,
-          75,
-          80
-        ]
-      }
-    }
-  },
-  csnow_total: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in [10:1]": {
-        colormap: [
-          0.1,
-          "#ccffff",
-          2,
-          "#99cccc",
-          5,
-          "#3399ff",
-          6,
-          "#9966ff",
-          11,
-          "#cc66ff",
-          12,
-          "#ff3399",
-          20,
-          "#ff99cc",
-          24,
-          "#ff7788",
-          36,
-          "#ffbb66",
-          48,
-          "#99ccff",
-          300,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.1,
-          0.5,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          14,
-          16,
-          18,
-          20,
-          24,
-          28,
-          32,
-          36,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100,
-          150,
-          200,
-          300,
-          400
-        ]
-      },
-      "cm [10:1]": {
-        colormap: [
-          0.25,
-          "#ccffff",
-          4,
-          "#99cccc",
-          12,
-          "#3399ff",
-          16,
-          "#9966ff",
-          28,
-          "#cc66ff",
-          36,
-          "#ff3399",
-          48,
-          "#ff99cc",
-          60,
-          "#ff7788",
-          90,
-          "#ffbb66",
-          120,
-          "#99ccff",
-          700,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.25,
-          0.5,
-          1,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          20,
-          24,
-          28,
-          32,
-          36,
-          40,
-          44,
-          48,
-          52,
-          60,
-          68,
-          76,
-          82,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          250,
-          300,
-          400,
-          500,
-          600,
-          700
-        ]
-      },
-      "mm [10:1]": {
-        colormap: [
-          2.5,
-          "#ccffff",
-          40,
-          "#99cccc",
-          120,
-          "#3399ff",
-          160,
-          "#9966ff",
-          280,
-          "#cc66ff",
-          360,
-          "#ff3399",
-          480,
-          "#ff99cc",
-          600,
-          "#ff7788",
-          900,
-          "#ffbb66",
-          1200,
-          "#99ccff",
-          7e3,
-          "#99ffff"
-        ],
-        breakpoints: [
-          2.5,
-          5,
-          10,
-          20,
-          40,
-          60,
-          80,
-          100,
-          120,
-          140,
-          160,
-          200,
-          240,
-          280,
-          320,
-          360,
-          400,
-          440,
-          480,
-          520,
-          600,
-          680,
-          760,
-          820,
-          900,
-          1e3,
-          1200,
-          1400,
-          1600,
-          1800,
-          2e3,
-          2500,
-          3e3,
-          4e3,
-          5e3,
-          6e3,
-          7e3
-        ]
-      }
-    }
-  },
-  csnow_1: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in [10:1]": {
-        colormap: [
-          0.1,
-          "#aaaaaa",
-          0.25,
-          "#444444",
-          0.5,
-          "#66aaff",
-          0.75,
-          "#0022cc",
-          1,
-          "#99ff00",
-          1.5,
-          "#00aa00",
-          2,
-          "#ffee00",
-          2.5,
-          "#ff3333",
-          3,
-          "#ff66ff",
-          3.5,
-          "#880066",
-          4,
-          "#666666",
-          10,
-          "#666666"
-        ],
-        breakpoints: [
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10
-        ]
-      },
-      "cm [10:1]": {
-        colormap: [
-          0.25,
-          "#aaaaaa",
-          0.5,
-          "#444444",
-          1.5,
-          "#66aaff",
-          2,
-          "#0022cc",
-          2.5,
-          "#99ff00",
-          4,
-          "#00aa00",
-          5,
-          "#ffee00",
-          6,
-          "#ff3333",
-          8,
-          "#ff66ff",
-          9,
-          "#880066",
-          10,
-          "#666666",
-          26,
-          "#666666"
-        ],
-        breakpoints: [
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26
-        ]
-      },
-      "mm [10:1]": {
-        colormap: [
-          2.5,
-          "#aaaaaa",
-          5,
-          "#444444",
-          15,
-          "#66aaff",
-          20,
-          "#0022cc",
-          25,
-          "#99ff00",
-          40,
-          "#00aa00",
-          50,
-          "#ffee00",
-          60,
-          "#ff3333",
-          80,
-          "#ff66ff",
-          90,
-          "#880066",
-          100,
-          "#666666",
-          260,
-          "#666666"
-        ],
-        breakpoints: [
-          2.5,
-          5,
-          7.5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100,
-          110,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          240,
-          260
-        ]
-      }
-    }
-  },
-  cfrzr_total: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in [QPF]": {
-        colormap: [
-          0.01,
-          "#eeccff",
-          0.1,
-          "#ff9999",
-          0.25,
-          "#cc3366",
-          0.5,
-          "#ff9933",
-          0.75,
-          "#ffee00",
-          1,
-          "#00cccc",
-          3,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#eeccff",
-          0.25,
-          "#ff9999",
-          0.75,
-          "#cc3366",
-          1,
-          "#cc0066",
-          2,
-          "#ffee00",
-          3,
-          "#00cccc",
-          7,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.25,
-          2.5,
-          2.75,
-          3,
-          3.25,
-          3.5,
-          3.75,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#eeccff",
-          2.5,
-          "#ff9999",
-          7.5,
-          "#cc3366",
-          10,
-          "#cc0066",
-          20,
-          "#ffee00",
-          30,
-          "#00cccc",
-          70,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          5,
-          7.5,
-          10,
-          12.5,
-          15,
-          17.5,
-          20,
-          22.5,
-          25,
-          27.5,
-          30,
-          32.5,
-          35,
-          37.5,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          240,
-          260
-        ]
-      }
-    }
-  },
-  cfrzr_1: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in [QPF]": {
-        colormap: [
-          0.01,
-          "#eeccff",
-          0.1,
-          "#ff9999",
-          0.3,
-          "#cc3366",
-          0.4,
-          "#cc0033",
-          0.5,
-          "#ff9933",
-          0.9,
-          "#ffee00",
-          1,
-          "#00cccc",
-          3,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.5,
-          3
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#eeccff",
-          0.25,
-          "#ff9999",
-          0.75,
-          "#cc3366",
-          1,
-          "#cc0033",
-          2,
-          "#ffee00",
-          3,
-          "#00cccc",
-          7,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.25,
-          2.5,
-          2.75,
-          3,
-          3.25,
-          3.5,
-          3.75,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#eeccff",
-          2.5,
-          "#ff9999",
-          7.5,
-          "#cc3366",
-          10,
-          "#cc0033",
-          20,
-          "#ffee00",
-          30,
-          "#00cccc",
-          70,
-          "#99ffff"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          5,
-          7.5,
-          10,
-          12.5,
-          15,
-          17.5,
-          20,
-          22.5,
-          25,
-          27.5,
-          30,
-          32.5,
-          35,
-          37.5,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160
-        ]
-      }
-    }
-  },
-  cicep_total: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in [3:1]": {
-        colormap: [
-          0.01,
-          "#eeccff",
-          0.1,
-          "#ff8888",
-          0.25,
-          "#cc6699",
-          0.5,
-          "#ff9933",
-          0.75,
-          "#ffee99",
-          1,
-          "#00cccc",
-          3,
-          "#66ccff"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10
-        ]
-      },
-      "cm [3:1]": {
-        colormap: [
-          0.03,
-          "#eeccff",
-          0.25,
-          "#ff8888",
-          0.75,
-          "#cc6699",
-          1,
-          "#cc33cc",
-          2,
-          "#ffee99",
-          3,
-          "#00cccc",
-          7,
-          "#66ccff"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.25,
-          2.5,
-          2.75,
-          3,
-          3.25,
-          3.5,
-          3.75,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26
-        ]
-      },
-      "mm [3:1]": {
-        colormap: [
-          0.3,
-          "#eeccff",
-          2.5,
-          "#ff8888",
-          7.5,
-          "#cc6699",
-          10,
-          "#cc33cc",
-          20,
-          "#ffee99",
-          30,
-          "#00cccc",
-          70,
-          "#66ccff"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          5,
-          7.5,
-          10,
-          12.5,
-          15,
-          17.5,
-          20,
-          22.5,
-          25,
-          27.5,
-          30,
-          32.5,
-          35,
-          37.5,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          240,
-          260
-        ]
-      }
-    }
-  },
-  cicep_1: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "in [3:1]": {
-        colormap: [
-          0.01,
-          "#eeccff",
-          0.1,
-          "#ff8888",
-          0.3,
-          "#cc6699",
-          0.4,
-          "#cc33cc",
-          0.5,
-          "#ff9933",
-          0.9,
-          "#ffee99",
-          1,
-          "#00cccc",
-          3,
-          "#66ccff"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.2,
-          0.3,
-          0.4,
-          0.5,
-          0.6,
-          0.7,
-          0.8,
-          0.9,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.5,
-          3
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#eeccff",
-          0.25,
-          "#ff8888",
-          0.75,
-          "#cc6699",
-          1,
-          "#cc33cc",
-          2,
-          "#ffee99",
-          3,
-          "#00cccc",
-          7,
-          "#66ccff"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.25,
-          1.5,
-          1.75,
-          2,
-          2.25,
-          2.5,
-          2.75,
-          3,
-          3.25,
-          3.5,
-          3.75,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#eeccff",
-          2.5,
-          "#ff8888",
-          7.5,
-          "#cc6699",
-          10,
-          "#cc33cc",
-          20,
-          "#ffee99",
-          30,
-          "#00cccc",
-          70,
-          "#66ccff"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          5,
-          7.5,
-          10,
-          12.5,
-          15,
-          17.5,
-          20,
-          22.5,
-          25,
-          27.5,
-          30,
-          32.5,
-          35,
-          37.5,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160
-        ]
-      }
-    }
-  },
-  crain_total: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      in: {
-        colormap: [
-          0.01,
-          "#dddddd",
-          0.1,
-          "#66ff66",
-          0.4,
-          "#00cc00",
-          0.5,
-          "#3399ff",
-          0.9,
-          "#66ccff",
-          1,
-          "#ffff00",
-          1.75,
-          "#ffcc00",
-          2,
-          "#ff9900",
-          3.5,
-          "#ff6600",
-          4,
-          "#994400",
-          10,
-          "#cc9966",
-          12,
-          "#cc33cc",
-          50,
-          "#ff33ff"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          14,
-          16,
-          18,
-          20,
-          24,
-          28,
-          32,
-          36,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#dddddd",
-          0.25,
-          "#66ff66",
-          1,
-          "#00cc00",
-          2,
-          "#66ccff",
-          3,
-          "#ffff00",
-          5,
-          "#ff9900",
-          9,
-          "#ff6600",
-          10,
-          "#994400",
-          25,
-          "#cc9966",
-          30,
-          "#cc33cc",
-          100,
-          "#ff33ff"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.75,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          110,
-          130,
-          150,
-          170,
-          200,
-          230,
-          250
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#dddddd",
-          2.5,
-          "#66ff66",
-          10,
-          "#00cc00",
-          20,
-          "#66ccff",
-          30,
-          "#ffff00",
-          50,
-          "#ff9900",
-          90,
-          "#ff6600",
-          100,
-          "#994400",
-          250,
-          "#cc9966",
-          300,
-          "#cc33cc",
-          1e3,
-          "#ff33ff"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          7.5,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          250,
-          300,
-          350,
-          400,
-          450,
-          500,
-          600,
-          700,
-          800,
-          900,
-          1e3,
-          1100,
-          1300,
-          1500,
-          1700,
-          2e3,
-          2300,
-          2500
-        ]
-      }
-    }
-  },
-  crain_1: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      in: {
-        colormap: [
-          0.01,
-          "#dddddd",
-          0.1,
-          "#66ff66",
-          0.4,
-          "#00cc00",
-          0.5,
-          "#3399ff",
-          0.9,
-          "#66ccff",
-          1,
-          "#ffff00",
-          1.75,
-          "#ffcc00",
-          2,
-          "#ff9900",
-          3.75,
-          "#ff6600",
-          4,
-          "#994400",
-          10,
-          "#cc9966",
-          12,
-          "#cc33cc"
-        ],
-        breakpoints: [
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#dddddd",
-          0.25,
-          "#66ff66",
-          1,
-          "#00cc00",
-          2,
-          "#66ccff",
-          3,
-          "#ffff00",
-          4,
-          "#ffcc00",
-          5,
-          "#ff9900",
-          9,
-          "#ff6600",
-          10,
-          "#994400",
-          25,
-          "#cc9966",
-          30,
-          "#cc33cc"
-        ],
-        breakpoints: [
-          0.25,
-          0.25,
-          0.75,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          25,
-          30
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#dddddd",
-          2.5,
-          "#66ff66",
-          10,
-          "#00cc00",
-          20,
-          "#66ccff",
-          30,
-          "#ffff00",
-          40,
-          "#ffcc00",
-          50,
-          "#ff9900",
-          90,
-          "#ff6600",
-          100,
-          "#994400",
-          250,
-          "#cc9966",
-          300,
-          "#cc33cc"
-        ],
-        breakpoints: [
-          2.5,
-          2.5,
-          7.5,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          250,
-          300
-        ]
-      }
-    }
-  },
-  tp_0_total: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      in: {
-        colormap: [
-          0.01,
-          "#dddddd",
-          0.1,
-          "#66ff66",
-          0.4,
-          "#00cc00",
-          0.5,
-          "#3399ff",
-          0.9,
-          "#66ccff",
-          1,
-          "#ffff00",
-          1.75,
-          "#ffcc00",
-          2,
-          "#ff9900",
-          3.5,
-          "#ff6600",
-          4,
-          "#994400",
-          10,
-          "#cc9966",
-          12,
-          "#cc33cc",
-          50,
-          "#ff33ff"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          14,
-          16,
-          18,
-          20,
-          24,
-          28,
-          32,
-          36,
-          40,
-          45,
-          50,
-          55,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#dddddd",
-          0.25,
-          "#66ff66",
-          1,
-          "#00cc00",
-          2,
-          "#66ccff",
-          3,
-          "#ffff00",
-          5,
-          "#ff9900",
-          9,
-          "#ff6600",
-          10,
-          "#994400",
-          25,
-          "#cc9966",
-          30,
-          "#cc33cc",
-          100,
-          "#ff33ff"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.75,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          110,
-          130,
-          150,
-          170,
-          200,
-          230,
-          250
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#dddddd",
-          2.5,
-          "#66ff66",
-          10,
-          "#00cc00",
-          20,
-          "#66ccff",
-          30,
-          "#ffff00",
-          50,
-          "#ff9900",
-          90,
-          "#ff6600",
-          100,
-          "#994400",
-          250,
-          "#cc9966",
-          300,
-          "#cc33cc",
-          1e3,
-          "#ff33ff"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          7.5,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          250,
-          300,
-          350,
-          400,
-          450,
-          500,
-          600,
-          700,
-          800,
-          900,
-          1e3,
-          1100,
-          1300,
-          1500,
-          1700,
-          2e3,
-          2300,
-          2500
-        ]
-      }
-    }
-  },
-  tp_0_1: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      in: {
-        colormap: [
-          0.01,
-          "#dddddd",
-          0.1,
-          "#66ff66",
-          0.4,
-          "#00cc00",
-          0.5,
-          "#3399ff",
-          0.9,
-          "#66ccff",
-          1,
-          "#ffff00",
-          1.75,
-          "#ffcc00",
-          2,
-          "#ff9900",
-          3.5,
-          "#ff6600",
-          4,
-          "#994400",
-          10,
-          "#cc9966"
-        ],
-        breakpoints: [
-          0.01,
-          0.1,
-          0.25,
-          0.5,
-          0.75,
-          1,
-          1.5,
-          2,
-          2.5,
-          3,
-          3.5,
-          4,
-          4.5,
-          5,
-          5.5,
-          6,
-          7,
-          8,
-          9,
-          10
-        ]
-      },
-      cm: {
-        colormap: [
-          0.03,
-          "#dddddd",
-          0.25,
-          "#66ff66",
-          1,
-          "#00cc00",
-          2,
-          "#66ccff",
-          3,
-          "#ffff00",
-          5,
-          "#ff9900",
-          9,
-          "#ff6600",
-          10,
-          "#994400",
-          25,
-          "#cc9966"
-        ],
-        breakpoints: [
-          0.03,
-          0.25,
-          0.75,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          25
-        ]
-      },
-      mm: {
-        colormap: [
-          0.3,
-          "#dddddd",
-          2.5,
-          "#66ff66",
-          10,
-          "#00cc00",
-          20,
-          "#66ccff",
-          30,
-          "#ffff00",
-          50,
-          "#ff9900",
-          90,
-          "#ff6600",
-          100,
-          "#994400",
-          250,
-          "#cc9966"
-        ],
-        breakpoints: [
-          0.3,
-          2.5,
-          7.5,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100,
-          120,
-          140,
-          160,
-          180,
-          200,
-          220,
-          250
-        ]
-      }
-    }
-  },
-  thickness: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          438,
-          "#0000ff",
-          540,
-          "#0000ff",
-          546,
-          "#ff0000",
-          630,
-          "#ff0000"
-        ],
-        breakpoints: [
-          438,
-          444,
-          450,
-          456,
-          462,
-          468,
-          474,
-          480,
-          486,
-          492,
-          498,
-          504,
-          510,
-          516,
-          522,
-          528,
-          534,
-          540,
-          546,
-          552,
-          558,
-          564,
-          570,
-          576,
-          582,
-          588,
-          594,
-          600,
-          606,
-          612,
-          618,
-          624,
-          630
-        ]
-      }
-    }
-  },
-  gh_10: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          2600,
-          "#0033ff",
-          2800,
-          "#00ddff",
-          3e3,
-          "#ff6666",
-          3200,
-          "#ff0000"
-        ],
-        breakpoints: [
-          2600,
-          2610,
-          2620,
-          2630,
-          2640,
-          2650,
-          2660,
-          2670,
-          2680,
-          2690,
-          2700,
-          2710,
-          2720,
-          2730,
-          2740,
-          2750,
-          2760,
-          2770,
-          2780,
-          2790,
-          2800,
-          2810,
-          2820,
-          2830,
-          2840,
-          2850,
-          2860,
-          2870,
-          2880,
-          2890,
-          2900,
-          2910,
-          2920,
-          2930,
-          2940,
-          2950,
-          2960,
-          2970,
-          2980,
-          2990,
-          3e3,
-          3010,
-          3020,
-          3030,
-          3040,
-          3050,
-          3060,
-          3070,
-          3080,
-          3090,
-          3100,
-          3110,
-          3120,
-          3130,
-          3140,
-          3150,
-          3160,
-          3170,
-          3180,
-          3190,
-          3200
-        ]
-      }
-    }
-  },
-  gh_200: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          1080,
-          "#0033ff",
-          1146,
-          "#00ddff",
-          1182,
-          "#ff6666",
-          1290,
-          "#ff0000"
-        ],
-        breakpoints: [
-          1080,
-          1086,
-          1092,
-          1098,
-          1104,
-          1110,
-          1116,
-          1122,
-          1128,
-          1134,
-          1140,
-          1146,
-          1152,
-          1158,
-          1164,
-          1170,
-          1176,
-          1182,
-          1188,
-          1194,
-          1200,
-          1206,
-          1212,
-          1218,
-          1224,
-          1230,
-          1236,
-          1242,
-          1248,
-          1254,
-          1260,
-          1266,
-          1272,
-          1278,
-          1284,
-          1290
-        ]
-      }
-    }
-  },
-  gh_300: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          768,
-          "#0033ff",
-          852,
-          "#00ddff",
-          948,
-          "#ff6666",
-          1e3,
-          "#ff0000"
-        ],
-        breakpoints: [
-          768,
-          774,
-          780,
-          786,
-          792,
-          798,
-          804,
-          810,
-          816,
-          822,
-          828,
-          834,
-          840,
-          846,
-          852,
-          858,
-          864,
-          870,
-          876,
-          882,
-          888,
-          894,
-          900,
-          906,
-          912,
-          918,
-          924,
-          930,
-          936,
-          942,
-          948,
-          954,
-          960,
-          966,
-          972,
-          978,
-          984,
-          990,
-          996,
-          1e3
-        ]
-      }
-    }
-  },
-  gh_500: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          438,
-          "#0033ff",
-          501,
-          "#00ddff",
-          600,
-          "#ff6666",
-          640,
-          "#ff0000"
-        ],
-        breakpoints: [
-          438,
-          441,
-          444,
-          447,
-          450,
-          453,
-          456,
-          459,
-          462,
-          465,
-          468,
-          471,
-          474,
-          477,
-          480,
-          483,
-          486,
-          489,
-          492,
-          495,
-          498,
-          501,
-          504,
-          507,
-          510,
-          513,
-          516,
-          519,
-          522,
-          525,
-          528,
-          531,
-          534,
-          537,
-          540,
-          543,
-          546,
-          549,
-          552,
-          555,
-          558,
-          561,
-          564,
-          567,
-          570,
-          573,
-          576,
-          579,
-          582,
-          585,
-          588,
-          591,
-          594,
-          597,
-          600,
-          603,
-          606,
-          609,
-          612,
-          615,
-          618,
-          621,
-          624,
-          627,
-          630,
-          633,
-          636,
-          639,
-          640
-        ]
-      }
-    }
-  },
-  gh_700: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          249,
-          "#0033ff",
-          282,
-          "#00ddff",
-          321,
-          "#ff6666",
-          350,
-          "#ff0000"
-        ],
-        breakpoints: [
-          249,
-          252,
-          255,
-          258,
-          261,
-          264,
-          267,
-          270,
-          273,
-          276,
-          279,
-          282,
-          285,
-          288,
-          291,
-          294,
-          297,
-          300,
-          303,
-          306,
-          309,
-          312,
-          315,
-          318,
-          321,
-          324,
-          327,
-          330,
-          333,
-          336,
-          339,
-          342,
-          345,
-          348,
-          350
-        ]
-      }
-    }
-  },
-  gh_850: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          120,
-          "#0033ff",
-          141,
-          "#00ddff",
-          153,
-          "#ff6666",
-          170,
-          "#ff0000"
-        ],
-        breakpoints: [
-          120,
-          123,
-          126,
-          129,
-          132,
-          135,
-          138,
-          141,
-          144,
-          147,
-          150,
-          153,
-          156,
-          159,
-          162,
-          165,
-          168,
-          170
-        ]
-      }
-    }
-  },
-  gh_925: {
-    type: "line",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      dam: {
-        colormap: [
-          48,
-          "#0033ff",
-          75,
-          "#00ddff",
-          105,
-          "#ff6666",
-          120,
-          "#ff0000"
-        ],
-        breakpoints: [
-          48,
-          51,
-          54,
-          57,
-          60,
-          63,
-          66,
-          69,
-          72,
-          75,
-          78,
-          81,
-          84,
-          87,
-          90,
-          91,
-          96,
-          99,
-          102,
-          105,
-          108,
-          111,
-          114,
-          117,
-          120
-        ]
-      }
-    }
-  },
-  moistureConvergence: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "s⁻¹": {
-        colormap: [
-          5,
-          "#00ffcc",
-          15,
-          "#00ff33",
-          30,
-          "#00cc00",
-          50,
-          "#006600"
-        ],
-        breakpoints: [
-          5,
-          10,
-          15,
-          20,
-          25,
-          30,
-          35,
-          40,
-          45,
-          50
-        ]
-      }
-    }
-  },
-  divergence: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "s⁻¹": {
-        colormap: [
-          -30,
-          "#00ccff",
-          -8,
-          "#ff0000",
-          -4,
-          "#ff9900",
-          -2,
-          "#ffee33",
-          0,
-          "#00ffcc",
-          4,
-          "#006600",
-          8,
-          "#00cc00",
-          30,
-          "#222222"
-        ],
-        breakpoints: [
-          -30,
-          -29,
-          -28,
-          -27,
-          -26,
-          -25,
-          -24,
-          -23,
-          -22,
-          -21,
-          -20,
-          -19,
-          -18,
-          -17,
-          -16,
-          -15,
-          -14,
-          -13,
-          -12,
-          -11,
-          -10,
-          -9,
-          -8,
-          -7,
-          -6,
-          -5,
-          -4,
-          -3,
-          -2,
-          -1,
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30
-        ]
-      }
-    }
-  },
-  irsat: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "°C": {
-        colormap: [
-          -100,
-          "#cc66ff",
-          -80,
-          "#f0f0f0",
-          -70,
-          "#000000",
-          -60,
-          "#ff0000",
-          -50,
-          "#ffee00",
-          -40,
-          "#33ff00",
-          -30,
-          "#0033cc",
-          -20,
-          "#00ffff",
-          -18,
-          "#ffffff",
-          60,
-          "#000000"
-        ],
-        breakpoints: [
-          -100,
-          -98,
-          -96,
-          -94,
-          -92,
-          -90,
-          -88,
-          -86,
-          -84,
-          -82,
-          -80,
-          -78,
-          -76,
-          -74,
-          -72,
-          -70,
-          -68,
-          -66,
-          -64,
-          -62,
-          -60,
-          -58,
-          -56,
-          -54,
-          -52,
-          -50,
-          -48,
-          -46,
-          -44,
-          -42,
-          -40,
-          -38,
-          -36,
-          -34,
-          -32,
-          -30,
-          -28,
-          -26,
-          -24,
-          -22,
-          -20,
-          -18,
-          -16,
-          -14,
-          -12,
-          -10,
-          -8,
-          -6,
-          -4,
-          -2,
-          0,
-          2,
-          4,
-          6,
-          8,
-          10,
-          12,
-          14,
-          16,
-          18,
-          20,
-          22,
-          24,
-          26,
-          28,
-          30,
-          32,
-          34,
-          36,
-          38,
-          40,
-          42,
-          44,
-          46,
-          48,
-          50,
-          52,
-          54,
-          56,
-          58,
-          60
-        ]
-      }
-    }
-  },
-  vis_0: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      mi: {
-        colormap: [
-          0,
-          "#000000",
-          2,
-          "#444444",
-          5,
-          "#888888",
-          7,
-          "#cccccc",
-          10,
-          "#ffffff"
-        ],
-        breakpoints: [
-          0,
-          2,
-          5,
-          7,
-          10
-        ]
-      },
-      km: {
-        colormap: [
-          0,
-          "#ffffff",
-          2,
-          "#cccccc",
-          5,
-          "#888888",
-          7,
-          "#444444",
-          10,
-          "#000000"
-        ],
-        breakpoints: [
-          0,
-          2,
-          5,
-          7,
-          10
-        ]
-      }
-    }
-  },
-  tcc_0: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#ffffff",
-          20,
-          "#cccccc",
-          50,
-          "#888888",
-          80,
-          "#444444",
-          100,
-          "#000000"
-        ],
-        breakpoints: [
-          0,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      }
-    }
-  },
-  hcc_0: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#ffffff",
-          20,
-          "#cccccc",
-          50,
-          "#888888",
-          80,
-          "#444444",
-          100,
-          "#000000"
-        ],
-        breakpoints: [
-          0,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      }
-    }
-  },
-  mcc_0: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#ffffff",
-          20,
-          "#cccccc",
-          50,
-          "#888888",
-          80,
-          "#444444",
-          100,
-          "#000000"
-        ],
-        breakpoints: [
-          0,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      }
-    }
-  },
-  lcc_0: {
-    type: "fill",
-    gridded: !1,
-    interpolationType: "interpolate",
-    units: {
-      "%": {
-        colormap: [
-          0,
-          "#ffffff",
-          20,
-          "#cccccc",
-          50,
-          "#888888",
-          80,
-          "#444444",
-          100,
-          "#000000"
-        ],
-        breakpoints: [
-          0,
-          10,
-          20,
-          30,
-          40,
-          50,
-          60,
-          70,
-          80,
-          90,
-          100
-        ]
-      }
-    }
-  }
 };
-function $(i, e) {
-  const a = 245.305142, r = Math.PI / 180, s = 180 / Math.PI, _ = 53.91148 * r, n = i * r, o = e * r, f = Math.sin(o), p = Math.cos(o), g = Math.sin(n), b = Math.cos(n), x = Math.sin(_), m = Math.cos(_), c = m * f + x * p * b;
-  let A = Math.asin(c) * s;
-  const P = p * g, z = -x * f + m * p * b;
-  let S = Math.atan2(P, z) * s + a;
-  return S > 180 ? S -= 360 : S < -180 && (S += 360), [S, A];
+function q(a, e) {
+  const i = 245.305142, r = Math.PI / 180, l = 180 / Math.PI, _ = 53.91148 * r, n = a * r, s = e * r, c = Math.sin(s), d = Math.cos(s), g = Math.sin(n), f = Math.cos(n), x = Math.sin(_), p = Math.cos(_), o = p * c + x * d * f;
+  let L = Math.asin(o) * l;
+  const S = d * g, P = -x * c + p * d * f;
+  let y = Math.atan2(S, P) * l + i;
+  return y > 180 ? y -= 360 : y < -180 && (y += 360), [y, L];
 }
-function J(i, e) {
-  const t = i == null ? void 0 : i[e];
+function J(a, e) {
+  const t = a == null ? void 0 : a[e];
   if (!t) return null;
-  const a = Object.keys(t).sort((r, s) => s.localeCompare(r));
-  for (const r of a) {
-    const s = t[r];
-    if (!s) continue;
-    const _ = Object.keys(s).sort((n, o) => o.localeCompare(n));
+  const i = Object.keys(t).sort((r, l) => l.localeCompare(r));
+  for (const r of i) {
+    const l = t[r];
+    if (!l) continue;
+    const _ = Object.keys(l).sort((n, s) => s.localeCompare(n));
     if (_.length > 0) return { date: r, run: _[0] };
   }
   return null;
 }
-class h0 extends i0 {
+class he extends ae {
   constructor(e, t = {}) {
     if (super(), !e) throw new Error("A Mapbox GL map instance is required.");
-    this.map = e, this.layers = /* @__PURE__ */ new Map(), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`, this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "preload", this.dataCache = /* @__PURE__ */ new Map(), this.isPlaying = !1, this.playIntervalId = null, this.playbackSpeed = t.playbackSpeed || 500, this.customColormaps = t.customColormaps || {};
-    const a = t.layerOptions || {}, r = a.variable || null;
-    let s, _;
+    this.map = e, this.layers = /* @__PURE__ */ new Map(), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`, this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.mrmsStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.dataCache = /* @__PURE__ */ new Map(), this.isPlaying = !1, this.playIntervalId = null, this.playbackSpeed = t.playbackSpeed || 500, this.customColormaps = t.customColormaps || {};
+    const i = t.layerOptions || {}, r = i.variable || null;
+    let l, _;
     if (r) {
       const n = this._getColormapForVariable(r);
-      s = n.colormap, _ = n.baseUnit;
+      l = n.colormap, _ = n.baseUnit;
     }
     this.baseLayerOptions = {
-      ...a,
+      ...i,
       variable: r,
-      colormap: s,
+      colormap: l,
       colormapBaseUnit: _
     }, this.state = {
-      model: a.model || "gfs",
+      model: i.model || "gfs",
+      isMRMS: !1,
+      // ADD THIS
+      mrmsTimestamp: null,
+      // ADD THIS
       variable: r,
       date: null,
       run: null,
       forecastHour: 0,
       visible: !0,
-      opacity: a.opacity ?? 1,
+      opacity: i.opacity ?? 1,
       units: t.initialUnit || "imperial"
     }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
   }
   getAvailableVariables(e = null) {
-    var a;
+    var i;
     const t = e || this.state.model;
-    return ((a = c0[t]) == null ? void 0 : a.vars) || [];
+    return ((i = _e[t]) == null ? void 0 : i.vars) || [];
   }
   getVariableDisplayName(e) {
-    const t = q.fld[e];
+    const t = Q.fld[e];
     return (t == null ? void 0 : t.displayName) || (t == null ? void 0 : t.name) || e;
   }
   _handleWorkerMessage(e) {
-    const { success: t, requestId: a, decompressedData: r, encoding: s, error: _ } = e.data;
-    if (this.workerResolvers.has(a)) {
-      const { resolve: n, reject: o } = this.workerResolvers.get(a);
-      t ? n({ data: r, encoding: s }) : o(new Error(_)), this.workerResolvers.delete(a);
+    const { success: t, requestId: i, decompressedData: r, encoding: l, error: _ } = e.data;
+    if (this.workerResolvers.has(i)) {
+      const { resolve: n, reject: s } = this.workerResolvers.get(i);
+      t ? n({ data: r, encoding: l }) : s(new Error(_)), this.workerResolvers.delete(i);
     }
   }
   play() {
@@ -13178,14 +5137,14 @@ class h0 extends i0 {
     this.isPlaying ? this.pause() : this.play();
   }
   step(e = 1) {
-    var p, g, b;
-    const { model: t, date: a, run: r, forecastHour: s } = this.state, _ = (b = (g = (p = this.modelStatus) == null ? void 0 : p[t]) == null ? void 0 : g[a]) == null ? void 0 : b[r];
+    var d, g, f;
+    const { model: t, date: i, run: r, forecastHour: l } = this.state, _ = (f = (g = (d = this.modelStatus) == null ? void 0 : d[t]) == null ? void 0 : g[i]) == null ? void 0 : f[r];
     if (!_ || _.length === 0) return;
-    const n = _.indexOf(s);
+    const n = _.indexOf(l);
     if (n === -1) return;
-    const o = _.length - 1;
-    let f = n + e;
-    f > o && (f = 0), f < 0 && (f = o), this.setState({ forecastHour: _[f] });
+    const s = _.length - 1;
+    let c = n + e;
+    c > s && (c = 0), c < 0 && (c = s), this.setState({ forecastHour: _[c] });
   }
   setPlaybackSpeed(e) {
     e > 0 && (this.playbackSpeed = e, this.isPlaying && this.play());
@@ -13197,42 +5156,113 @@ class h0 extends i0 {
    * @private
    */
   async _updateLayerData(e) {
-    if (!e.variable)
-      return;
-    const t = await this._loadGridData(e), a = this.layers.get(this.layerId);
-    if (t && t.data && a) {
-      const { shaderLayer: r } = a, s = this._getGridCornersAndDef(e.model).gridDef;
-      r.updateDataTexture(
-        t.data,
-        t.encoding,
-        s.grid_params.nx,
-        s.grid_params.ny
-      ), r.updateStyle({ opacity: this.state.opacity }), this.map.triggerRepaint();
+    const t = performance.now();
+    if (console.log("[_updateLayerData] START (fallback path)"), !e.variable) return;
+    const i = performance.now(), r = await this._loadGridData(e);
+    console.log("[_updateLayerData] Load grid data took:", (performance.now() - i).toFixed(2), "ms");
+    const l = this.layers.get(this.layerId);
+    if (r && r.data && l) {
+      const _ = performance.now(), { shaderLayer: n } = l, s = e.isMRMS ? "mrms" : e.model, c = this._getGridCornersAndDef(s).gridDef;
+      n.updateDataTexture(
+        r.data,
+        r.encoding,
+        c.grid_params.nx,
+        c.grid_params.ny
+      ), n.updateStyle({ opacity: this.state.opacity }), this.map.triggerRepaint(), console.log("[_updateLayerData] Update operations took:", (performance.now() - _).toFixed(2), "ms");
     }
+    console.log("[_updateLayerData] COMPLETE - Total time:", (performance.now() - t).toFixed(2), "ms");
   }
   async setOpacity(e) {
     const t = Math.max(0, Math.min(1, e));
     t !== this.state.opacity && await this.setState({ opacity: t });
   }
   async setState(e) {
-    var f, p, g, b;
-    const t = e.model && e.model !== this.state.model, a = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), r = e.variable !== void 0 && e.variable !== this.state.variable, _ = e.forecastHour !== void 0 && e.forecastHour !== this.state.forecastHour && !t && !a && !r;
-    ({ ...this.state }, Object.assign(this.state, e)), (t || a || r) && (this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
-    let n = [], o = "";
+    var S, P, y, k;
+    const t = performance.now();
+    console.log("[setState] START", {
+      newState: e,
+      currentState: this.state
+    });
+    const i = e.model && e.model !== this.state.model, r = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), l = e.variable !== void 0 && e.variable !== this.state.variable, _ = e.forecastHour !== void 0 && e.forecastHour !== this.state.forecastHour, n = e.mrmsTimestamp !== void 0 && e.mrmsTimestamp !== this.state.mrmsTimestamp, s = e.isMRMS !== void 0 && e.isMRMS !== this.state.isMRMS;
+    console.log("[setState] Change detection:", {
+      modelChanged: i,
+      runChanged: r,
+      variableChanged: l,
+      hourChanged: _,
+      mrmsTimestampChanged: n,
+      modeChanged: s
+    });
+    const c = l || s && e.variable !== null, d = (_ || n) && !i && !r && !l && !s;
+    console.log("[setState] Optimization flags:", {
+      shouldClearCache: c,
+      isOnlyTimeChange: d
+    }), { ...this.state }, Object.assign(this.state, e), c && (console.log("[setState] Clearing cache and hiding layer"), this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
+    const g = performance.now();
+    let f = [], x = "";
     if (this.state.variable && this.baseLayerOptions.colormap) {
-      const x = this.baseLayerOptions.colormap, m = this.baseLayerOptions.colormapBaseUnit;
-      o = this._getTargetUnit(m, this.state.units), n = this._convertColormapUnits(x, m, o);
+      const v = this.baseLayerOptions.colormap, h = this.baseLayerOptions.colormapBaseUnit;
+      x = this._getTargetUnit(h, this.state.units), f = this._convertColormapUnits(v, h, x);
     }
+    console.log("[setState] Colormap processing took:", (performance.now() - g).toFixed(2), "ms");
+    let p = [];
+    this.state.isMRMS && this.state.variable && this.mrmsStatus && (p = [...this.mrmsStatus[this.state.variable] || []].reverse());
+    const o = performance.now();
     this.emit("state:change", {
       ...this.state,
       availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
-      availableRuns: ((f = this.modelStatus) == null ? void 0 : f[this.state.model]) || {},
-      availableHours: ((b = (g = (p = this.modelStatus) == null ? void 0 : p[this.state.model]) == null ? void 0 : g[this.state.date]) == null ? void 0 : b[this.state.run]) || [],
-      availableVariables: this.getAvailableVariables(this.state.model),
+      availableRuns: ((S = this.modelStatus) == null ? void 0 : S[this.state.model]) || {},
+      availableHours: this.state.isMRMS ? [] : ((k = (y = (P = this.modelStatus) == null ? void 0 : P[this.state.model]) == null ? void 0 : y[this.state.date]) == null ? void 0 : k[this.state.run]) || [],
+      availableVariables: this.getAvailableVariables(this.state.isMRMS ? "mrms" : this.state.model),
+      availableTimestamps: p,
       isPlaying: this.isPlaying,
-      colormap: n,
-      colormapBaseUnit: o
-    }), _ ? await this._updateLayerData(this.state) : await this._loadAndRenderGrid(this.state), (t || a || r) && this.loadStrategy === "preload" && this.state.variable && setTimeout(() => this._preloadCurrentRun(), 0);
+      colormap: f,
+      colormapBaseUnit: x
+    }), console.log("[setState] Event emission took:", (performance.now() - o).toFixed(2), "ms");
+    const L = performance.now();
+    d ? (console.log("[setState] Using FAST PATH for time-only change"), await this._updateLayerDataFast(this.state)) : (c || !this.layers.has(this.layerId)) && (console.log("[setState] Using FULL PATH for layer recreation"), await this._loadAndRenderGrid(this.state)), console.log("[setState] Render path took:", (performance.now() - L).toFixed(2), "ms"), c && this.loadStrategy === "preload" && this.state.variable && (console.log("[setState] Triggering preload in background"), this.state.isMRMS ? setTimeout(() => this._preloadMRMSVariable(), 0) : setTimeout(() => this._preloadCurrentRun(), 0)), console.log("[setState] COMPLETE - Total time:", (performance.now() - t).toFixed(2), "ms");
+  }
+  async _updateLayerDataFast(e) {
+    const t = performance.now();
+    if (console.log("[_updateLayerDataFast] START", { state: e }), !e.variable) {
+      console.log("[_updateLayerDataFast] No variable selected, exiting");
+      return;
+    }
+    const i = this.layers.get(this.layerId);
+    if (!i) {
+      console.log("[_updateLayerDataFast] No layer found, exiting");
+      return;
+    }
+    const r = performance.now(), { model: l, date: _, run: n, forecastHour: s, variable: c, smoothing: d = 0, isMRMS: g, mrmsTimestamp: f } = e;
+    let x;
+    if (g) {
+      if (!f) {
+        console.log("[_updateLayerDataFast] No MRMS timestamp, exiting");
+        return;
+      }
+      x = `mrms-${f}-${c}-${d || ""}`;
+    } else
+      x = `${l}-${_}-${n}-${s}-${c}-${d || ""}`;
+    console.log("[_updateLayerDataFast] Cache key:", x), console.log("[_updateLayerDataFast] Key generation took:", (performance.now() - r).toFixed(2), "ms");
+    const p = performance.now(), o = this.dataCache.get(x);
+    if (console.log("[_updateLayerDataFast] Cache check took:", (performance.now() - p).toFixed(2), "ms"), !o) {
+      console.warn("[_updateLayerDataFast] ⚠️ Data NOT in cache! Falling back to full load"), console.log("[_updateLayerDataFast] Current cache keys:", Array.from(this.dataCache.keys())), await this._updateLayerData(e);
+      return;
+    }
+    console.log("[_updateLayerDataFast] ✓ Data found in cache");
+    const L = performance.now(), S = await o;
+    if (console.log("[_updateLayerDataFast] Await cached data took:", (performance.now() - L).toFixed(2), "ms"), S && S.data) {
+      const P = performance.now(), { shaderLayer: y } = i, k = e.isMRMS ? "mrms" : e.model, v = this._getGridCornersAndDef(k).gridDef;
+      console.log("[_updateLayerDataFast] Grid data size:", S.data.length, "bytes"), console.log("[_updateLayerDataFast] Grid dimensions:", v.grid_params.nx, "x", v.grid_params.ny), y.updateDataTexture(
+        S.data,
+        S.encoding,
+        v.grid_params.nx,
+        v.grid_params.ny
+      ), console.log("[_updateLayerDataFast] Texture update took:", (performance.now() - P).toFixed(2), "ms");
+      const h = performance.now();
+      this.map.triggerRepaint(), console.log("[_updateLayerDataFast] Trigger repaint took:", (performance.now() - h).toFixed(2), "ms");
+    } else
+      console.error("[_updateLayerDataFast] ❌ Grid data is null or missing");
+    console.log("[_updateLayerDataFast] COMPLETE - Total time:", (performance.now() - t).toFixed(2), "ms");
   }
   async _loadAndRenderGrid(e) {
     if (!e.variable) {
@@ -13241,15 +5271,18 @@ class h0 extends i0 {
     }
     const t = await this._loadGridData(e);
     if (t && t.data) {
-      const a = { ...this.baseLayerOptions, ...e };
-      this._updateOrCreateLayer(this.layerId, a, t.data, t.encoding);
+      const i = { ...this.baseLayerOptions, ...e };
+      this._updateOrCreateLayer(this.layerId, i, t.data, t.encoding);
     } else
       this.removeLayer(this.layerId);
   }
-  async setVariable(e) {
-    if (e === this.state.variable) return;
-    const { colormap: t, baseUnit: a } = this._getColormapForVariable(e);
-    this.baseLayerOptions.variable = e, this.baseLayerOptions.colormap = t, this.baseLayerOptions.colormapBaseUnit = a, await this.setState({ variable: e, forecastHour: 0 });
+  setVariable(e) {
+    const { colormap: t, baseUnit: i } = this._getColormapForVariable(e);
+    this.setState({
+      variable: e,
+      colormap: t,
+      colormapBaseUnit: i
+    });
   }
   async setModel(e) {
     if (e === this.state.model || !this.modelStatus || !this.modelStatus[e]) return;
@@ -13257,100 +5290,77 @@ class h0 extends i0 {
     t && await this.setState({ model: e, date: t.date, run: t.run, forecastHour: 0 });
   }
   async setRun(e) {
-    const [t, a] = e.split(":");
-    (t !== this.state.date || a !== this.state.run) && await this.setState({ date: t, run: a, forecastHour: 0 });
+    const [t, i] = e.split(":");
+    (t !== this.state.date || i !== this.state.run) && await this.setState({ date: t, run: i, forecastHour: 0 });
   }
   async setUnits(e) {
     e === this.state.units || !["metric", "imperial"].includes(e) || await this.setState({ units: e });
   }
   async initialize(e = {}) {
-    await this.fetchModelStatus(!0);
+    await this.fetchModelStatus(!0), await this.fetchMRMSStatus(!0);
     const t = J(this.modelStatus, this.state.model);
-    let a = this.state;
-    t && (a = { ...this.state, ...t, forecastHour: 0 }), await this.setState(a), (e.autoRefresh ?? this.autoRefreshEnabled) && this.startAutoRefresh(e.refreshInterval ?? this.autoRefreshIntervalSeconds);
+    let i = this.state;
+    t && !this.state.isMRMS && (i = { ...this.state, ...t, forecastHour: 0 }), await this.setState(i), (e.autoRefresh ?? this.autoRefreshEnabled) && this.startAutoRefresh(e.refreshInterval ?? this.autoRefreshIntervalSeconds);
   }
   _getColormapForVariable(e) {
-    var s, _;
-    const t = this.customColormaps[e];
-    if (t) {
-      if (t.units) {
-        const n = this.state.units;
-        let o;
-        if (n === "imperial" && (o = "fahrenheit"), n === "metric" && (o = "celsius"), o && ((s = t.units[o]) != null && s.colormap))
-          return {
-            colormap: t.units[o].colormap,
-            baseUnit: o
-          };
-      }
-      if (t.colormap && t.baseUnit)
-        return {
-          colormap: t.colormap,
-          baseUnit: t.baseUnit
-        };
-    }
-    const a = ((_ = q.variable_cmap) == null ? void 0 : _[e]) || e, r = _0[a];
-    if (r) {
-      const n = Object.keys(r.units)[0];
-      return {
-        colormap: r.units[n].colormap,
-        baseUnit: n
-      };
-    }
-    return console.warn(`[Manager] No custom or default colormap found for variable "${e}". Using fallback.`), {
-      colormap: [0, "#000000", 1, "#ffffff"],
-      baseUnit: "unknown"
-    };
+    let t = e;
+    Q.variable_cmap[e] && (t = Q.variable_cmap[e], console.log(`[DEBUG] _getColormap: Mapped "${e}" to colormap key "${t}".`));
+    const i = this.customColormaps[t];
+    return i && i.colormap ? {
+      colormap: i.colormap,
+      baseUnit: i.baseUnit || ""
+    } : (console.warn(`[DEBUG] _getColormap: Colormap NOT found for variable "${e}" (resolved key: "${t}").`), { colormap: [], baseUnit: "" });
   }
-  _convertColormapUnits(e, t, a) {
-    if (t === a) return e;
-    const r = s0(t, a);
+  _convertColormapUnits(e, t, i) {
+    if (t === i) return e;
+    const r = oe(t, i);
     if (!r) return e;
-    const s = [];
+    const l = [];
     for (let _ = 0; _ < e.length; _ += 2)
-      s.push(r(e[_]), e[_ + 1]);
-    return s;
+      l.push(r(e[_]), e[_ + 1]);
+    return l;
   }
   /**
    * NEW: Replaces the old corner calculation with the more robust logic from your code.
    * @private
    */
   _getGridCornersAndDef(e) {
-    const t = { ...n0[e], modelName: e };
+    const t = { ...ne[e], modelName: e };
     if (!t) return null;
-    const { nx: a, ny: r } = t.grid_params, s = t.type;
+    const { nx: i, ny: r } = t.grid_params, l = t.type;
     let _;
-    if (s === "latlon") {
-      let { lon_first: n, lat_first: o, lat_last: f, lon_last: p, dx_degrees: g, dy_degrees: b } = t.grid_params;
+    if (l === "latlon") {
+      let { lon_first: n, lat_first: s, lat_last: c, lon_last: d, dx_degrees: g, dy_degrees: f } = t.grid_params;
       _ = {
         lon_tl: n,
-        lat_tl: o,
-        lon_tr: p !== void 0 ? p : n + (a - 1) * g,
-        lat_tr: o,
+        lat_tl: s,
+        lon_tr: d !== void 0 ? d : n + (i - 1) * g,
+        lat_tr: s,
         lon_bl: n,
-        lat_bl: f !== void 0 ? f : o + (r - 1) * b,
-        lon_br: p !== void 0 ? p : n + (a - 1) * g,
-        lat_br: f !== void 0 ? f : o + (r - 1) * b
+        lat_bl: c !== void 0 ? c : s + (r - 1) * f,
+        lon_br: d !== void 0 ? d : n + (i - 1) * g,
+        lat_br: c !== void 0 ? c : s + (r - 1) * f
       };
-    } else if (s === "rotated_latlon") {
-      const [n, o] = $(t.grid_params.lon_first, t.grid_params.lat_first), [f, p] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first), [g, b] = $(t.grid_params.lon_first, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees), [x, m] = $(t.grid_params.lon_first + (a - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees);
-      _ = { lon_tl: n, lat_tl: o, lon_tr: f, lat_tr: p, lon_bl: g, lat_bl: b, lon_br: x, lat_br: m };
-    } else if (s === "lambert_conformal_conic" || s === "polar_stereographic") {
-      let n = Object.entries(t.proj_params).map(([C, v]) => `+${C}=${v}`).join(" ");
-      s === "polar_stereographic" && (n += " +lat_0=90");
-      const { x_origin: o, y_origin: f, dx: p, dy: g } = t.grid_params, [b, x] = O(n, "EPSG:4326", [o, f]), [m, c] = O(n, "EPSG:4326", [o + (a - 1) * p, f]), [A, P] = O(n, "EPSG:4326", [o, f + (r - 1) * g]), [z, S] = O(n, "EPSG:4326", [o + (a - 1) * p, f + (r - 1) * g]);
-      _ = { lon_tl: b, lat_tl: x, lon_tr: m, lat_tr: c, lon_bl: A, lat_bl: P, lon_br: z, lat_br: S };
+    } else if (l === "rotated_latlon") {
+      const [n, s] = q(t.grid_params.lon_first, t.grid_params.lat_first), [c, d] = q(t.grid_params.lon_first + (i - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first), [g, f] = q(t.grid_params.lon_first, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees), [x, p] = q(t.grid_params.lon_first + (i - 1) * t.grid_params.dx_degrees, t.grid_params.lat_first + (r - 1) * t.grid_params.dy_degrees);
+      _ = { lon_tl: n, lat_tl: s, lon_tr: c, lat_tr: d, lon_bl: g, lat_bl: f, lon_br: x, lat_br: p };
+    } else if (l === "lambert_conformal_conic" || l === "polar_stereographic") {
+      let n = Object.entries(t.proj_params).map(([k, v]) => `+${k}=${v}`).join(" ");
+      l === "polar_stereographic" && (n += " +lat_0=90");
+      const { x_origin: s, y_origin: c, dx: d, dy: g } = t.grid_params, [f, x] = O(n, "EPSG:4326", [s, c]), [p, o] = O(n, "EPSG:4326", [s + (i - 1) * d, c]), [L, S] = O(n, "EPSG:4326", [s, c + (r - 1) * g]), [P, y] = O(n, "EPSG:4326", [s + (i - 1) * d, c + (r - 1) * g]);
+      _ = { lon_tl: f, lat_tl: x, lon_tr: p, lat_tr: o, lon_bl: L, lat_bl: S, lon_br: P, lat_br: y };
     } else
       return null;
     return { corners: _, gridDef: t };
   }
-  _updateOrCreateLayer(e, t, a, r) {
-    const { model: s, colormap: _, opacity: n = 1, visible: o = !0, units: f, variable: p } = t, g = this._getGridCornersAndDef(s);
-    if (!g) {
-      console.error(`Could not generate geometry for model: ${s}`);
+  _updateOrCreateLayer(e, t, i, r) {
+    const { model: l, colormap: _, opacity: n = 1, visible: s = !0, units: c, variable: d, isMRMS: g } = t, f = g ? "mrms" : l, x = this._getGridCornersAndDef(f);
+    if (!x) {
+      console.error(`Could not generate geometry for model: ${f}`);
       return;
     }
-    const { corners: b, gridDef: x } = g, m = t.colormapBaseUnit, c = q.fld[p] || {}, A = this._getTargetUnit(m, f), P = this._convertColormapUnits(_, m, A), z = [P[0], P[P.length - 2]], S = c.defaultUnit || "none", C = this.layers.has(e), v = C ? this.layers.get(e).shaderLayer : new r0(e);
-    C || (this.map.addLayer(v, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: v, options: t, visible: o })), v.updateGeometry(b, x), v.updateDataTexture(a, r, x.grid_params.nx, x.grid_params.ny), v.updateColormapTexture(P), v.updateStyle({ opacity: o ? this.state.opacity : 0, dataRange: z }), v.setUnitConversion(S, f), this.map.triggerRepaint();
+    const { corners: p, gridDef: o } = x, L = t.colormapBaseUnit, S = Q.fld[d] || {}, P = this._getTargetUnit(L, c), y = this._convertColormapUnits(_, L, P), k = [y[0], y[y.length - 2]], v = S.defaultUnit || "none", h = this.layers.has(e), R = h ? this.layers.get(e).shaderLayer : new re(e);
+    h || (this.map.addLayer(R, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: R, options: t, visible: s })), R.updateGeometry(p, o), R.updateDataTexture(i, r, o.grid_params.nx, o.grid_params.ny), R.updateColormapTexture(y), R.updateStyle({ opacity: s ? this.state.opacity : 0, dataRange: k }), R.setUnitConversion(v, c), this.map.triggerRepaint();
   }
   _getTargetUnit(e, t) {
     if (t === "metric") {
@@ -13395,26 +5405,77 @@ class h0 extends i0 {
     return new Worker(URL.createObjectURL(t), { type: "module" });
   }
   async _preloadCurrentRun() {
-    var _, n, o;
-    const { model: e, date: t, run: a } = this.state, r = (o = (n = (_ = this.modelStatus) == null ? void 0 : _[e]) == null ? void 0 : n[t]) == null ? void 0 : o[a];
+    var _, n, s;
+    const { model: e, date: t, run: i } = this.state, r = (s = (n = (_ = this.modelStatus) == null ? void 0 : _[e]) == null ? void 0 : n[t]) == null ? void 0 : s[i];
     if (!r || r.length === 0) return;
-    const s = r.map((f) => {
-      const p = { ...this.state, forecastHour: f };
-      return this._loadGridData(p);
+    const l = r.map((c) => {
+      const d = { ...this.state, forecastHour: c };
+      return this._loadGridData(d);
     });
-    await Promise.all(s);
+    await Promise.all(l);
   }
   async fetchModelStatus(e = !1) {
     if (!this.modelStatus || e)
       try {
         const t = await fetch(this.statusUrl);
         if (!t.ok) throw new Error(`HTTP error! Status: ${t.status}`);
-        const a = await t.json();
-        this.modelStatus = a.models;
+        const i = await t.json();
+        this.modelStatus = i.models;
       } catch {
         this.modelStatus = null;
       }
     return this.modelStatus;
+  }
+  async fetchMRMSStatus(e = !1) {
+    const t = "https://h3dfvh5pq6euq36ymlpz4zqiha0obqju.lambda-url.us-east-2.on.aws";
+    if (!this.mrmsStatus || e)
+      try {
+        const i = await fetch(t);
+        if (!i.ok) throw new Error(`HTTP error! Status: ${i.status}`);
+        const r = await i.json();
+        this.mrmsStatus = r;
+      } catch (i) {
+        console.error("[FillLayerManager] Failed to fetch MRMS status:", i), this.mrmsStatus = null;
+      }
+    return this.mrmsStatus;
+  }
+  /**
+   * Sets the active MRMS variable, prepares the state, and triggers preloading.
+   * Includes detailed logging for debugging.
+   *
+   * @param {string} variable - The MRMS variable code.
+   */
+  async setMRMSVariable(e) {
+    const t = [...this.mrmsStatus[e] || []].sort((n, s) => n - s), i = t.length > 0 ? t[t.length - 1] : null, { colormap: r, baseUnit: l } = this._getColormapForVariable(e), _ = {
+      variable: e,
+      isMRMS: !0,
+      mrmsTimestamp: i,
+      availableTimestamps: t,
+      colormap: r,
+      colormapBaseUnit: l
+    };
+    console.log("[DEBUG] setMRMSVariable: Setting new state:", _), this.setState(_), await this._preloadMRMSVariable();
+  }
+  /**
+   * Preloads all grid data for the currently selected MRMS variable.
+   * Includes logging to confirm execution.
+   */
+  async _preloadMRMSVariable() {
+    const { variable: e } = this.state;
+    if (!this.mrmsStatus || !e) {
+      console.log("[DEBUG] _preloadMRMSVariable: Aborting, no variable selected.");
+      return;
+    }
+    const t = this.mrmsStatus[e] || [];
+    console.log(`[DEBUG] _preloadMRMSVariable: Starting preload for ${t.length} timestamps for variable "${e}".`);
+    const i = t.map((r) => {
+      const l = { ...this.state, mrmsTimestamp: r };
+      return this._loadGridData(l);
+    });
+    await Promise.all(i), console.log(`[DEBUG] _preloadMRMSVariable: Preload finished for variable "${e}".`);
+  }
+  async setMRMSTimestamp(e) {
+    this.state.isMRMS && await this.setState({ mrmsTimestamp: e });
   }
   startAutoRefresh(e) {
     const t = e ?? this.autoRefreshIntervalSeconds ?? 60;
@@ -13426,21 +5487,38 @@ class h0 extends i0 {
     this.autoRefreshIntervalId && (clearInterval(this.autoRefreshIntervalId), this.autoRefreshIntervalId = null);
   }
   async _loadGridData(e) {
-    const { model: t, date: a, run: r, forecastHour: s, variable: _, smoothing: n = 0 } = { ...this.baseLayerOptions, ...e }, o = `${t}-${a}-${r}-${s}-${_}-${n || ""}`;
-    if (this.dataCache.has(o))
-      return this.dataCache.get(o);
-    const f = new Promise(async (p, g) => {
-      const b = `${this.baseUrl}/${t}/${a}/${r}/${s}/${_}/${n}`;
+    const t = performance.now();
+    console.log("[_loadGridData] START", { state: e });
+    const { model: i, date: r, run: l, forecastHour: _, variable: n, smoothing: s = 0, isMRMS: c, mrmsTimestamp: d } = { ...this.baseLayerOptions, ...e };
+    let g, f;
+    if (c) {
+      if (!d)
+        return console.error("[_loadGridData] Cannot fetch MRMS data without a timestamp."), null;
+      const p = new Date(d * 1e3), o = p.getUTCFullYear(), L = (p.getUTCMonth() + 1).toString().padStart(2, "0"), S = p.getUTCDate().toString().padStart(2, "0"), P = `${o}${L}${S}`, y = "mrms";
+      g = `${y}-${d}-${n}-${s || ""}`, f = `${this.baseUrl}/${y}/${P}/${d}/0/${n}/${s}`;
+    } else
+      g = `${i}-${r}-${l}-${_}-${n}-${s || ""}`, f = `${this.baseUrl}/${i}/${r}/${l}/${_}/${n}/${s}`;
+    if (console.log("[_loadGridData] Data URL:", f), console.log("[_loadGridData] Cache identifier:", g), this.dataCache.has(g)) {
+      console.log("[_loadGridData] ✓ Returning from cache");
+      const p = this.dataCache.get(g);
+      return console.log("[_loadGridData] COMPLETE (cached) - Total time:", (performance.now() - t).toFixed(2), "ms"), p;
+    }
+    console.log("[_loadGridData] Cache MISS - fetching from network");
+    const x = new Promise(async (p, o) => {
       try {
-        const x = await fetch(b);
-        if (!x.ok) throw new Error(`HTTP ${x.status} for ${b}`);
-        const { data: m, encoding: c } = await x.json(), A = Uint8Array.from(atob(m), (z) => z.charCodeAt(0)), P = this.workerRequestId++;
-        this.workerResolvers.set(P, { resolve: p, reject: g }), this.worker.postMessage({ requestId: P, compressedData: A, encoding: c }, [A.buffer]);
-      } catch (x) {
-        g(x);
+        const L = performance.now(), S = await fetch(f);
+        if (console.log("[_loadGridData] Network fetch took:", (performance.now() - L).toFixed(2), "ms"), !S.ok) throw new Error(`HTTP ${S.status} for ${f}`);
+        const P = performance.now(), { data: y, encoding: k } = await S.json();
+        console.log("[_loadGridData] JSON parse took:", (performance.now() - P).toFixed(2), "ms");
+        const v = performance.now(), h = Uint8Array.from(atob(y), (T) => T.charCodeAt(0));
+        console.log("[_loadGridData] Base64 decode took:", (performance.now() - v).toFixed(2), "ms"), console.log("[_loadGridData] Compressed size:", h.length, "bytes");
+        const R = performance.now(), b = this.workerRequestId++;
+        this.workerResolvers.set(b, { resolve: p, reject: o }), console.log("[_loadGridData] Sending to worker, requestId:", b), this.worker.postMessage({ requestId: b, compressedData: h, encoding: k }, [h.buffer]), console.log("[_loadGridData] Worker message sent in:", (performance.now() - R).toFixed(2), "ms");
+      } catch (L) {
+        console.error("[_loadGridData] ❌ Error:", L), o(L);
       }
-    }).then((p) => (this.dataCache.set(o, p), p)).catch((p) => (this.dataCache.delete(o), null));
-    return this.dataCache.set(o, f), f;
+    }).then((p) => (console.log("[_loadGridData] Worker returned successfully"), this.dataCache.set(g, p), console.log("[_loadGridData] COMPLETE (new fetch) - Total time:", (performance.now() - t).toFixed(2), "ms"), p)).catch((p) => (console.error(`[_loadGridData] Failed to load from ${f}:`, p), this.dataCache.delete(g), null));
+    return this.dataCache.set(g, x), x;
   }
   removeLayer(e) {
     this.layers.has(e) && (this.map.getLayer(e) && this.map.removeLayer(e), this.layers.delete(e));
@@ -13449,7 +5527,7 @@ class h0 extends i0 {
     this.pause(), this.stopAutoRefresh(), this.removeLayer(this.layerId), this.dataCache.clear(), this.worker.terminate(), this.callbacks = {}, console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
   }
 }
-const l0 = {
+const le = {
   landOcean: {
     landColor: "#f0f0f0",
     oceanColor: "#a8d8ea",
@@ -13496,7 +5574,7 @@ const l0 = {
     accentColor: "#b0b0b0"
   },
   oceanOnTop: !1
-}, f0 = {
+}, ce = {
   landOcean: {
     landColor: "#242424",
     oceanColor: "#252525",
@@ -13544,9 +5622,9 @@ const l0 = {
   },
   oceanOnTop: !1
 }, K = {
-  light: l0,
-  dark: f0
-}, L = {
+  light: le,
+  dark: ce
+}, E = {
   // Background and water layers
   landColor: { layerId: "AML_-_land" },
   oceanColor: { layerId: "AML_-_water" },
@@ -13573,58 +5651,58 @@ const l0 = {
   // Assuming point label for natural features
   subdivisionLabels: { layerId: "AML_-_subdivision-label" }
 };
-function W(i) {
-  return typeof i == "string" && i.startsWith("#") && i.length === 9 ? i.substring(0, 7) : i;
+function W(a) {
+  return typeof a == "string" && a.startsWith("#") && a.length === 9 ? a.substring(0, 7) : a;
 }
-const N = (i, e, t) => {
-  if (i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "line-color", W(t.color)), i.setPaintProperty(e, "line-width", t.width), t.lineType)) {
-    const a = { dashed: [2, 2], dotted: [0, 2], solid: [] };
-    i.setPaintProperty(e, "line-dasharray", a[t.lineType] || []);
+const N = (a, e, t) => {
+  if (a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "line-color", W(t.color)), a.setPaintProperty(e, "line-width", t.width), t.lineType)) {
+    const i = { dashed: [2, 2], dotted: [0, 2], solid: [] };
+    a.setPaintProperty(e, "line-dasharray", i[t.lineType] || []);
   }
-}, B = (i, e, t) => {
-  i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "text-color", W(t.color)), i.setPaintProperty(e, "text-halo-color", W(t.outlineColor)), i.setPaintProperty(e, "text-halo-width", t.outlineWidth), i.setLayoutProperty(e, "text-size", t.fontSize), i.setLayoutProperty(e, "text-font", [t.fontFamily]));
+}, G = (a, e, t) => {
+  a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "text-color", W(t.color)), a.setPaintProperty(e, "text-halo-color", W(t.outlineColor)), a.setPaintProperty(e, "text-halo-width", t.outlineWidth), a.setLayoutProperty(e, "text-size", t.fontSize), a.setLayoutProperty(e, "text-font", [t.fontFamily]));
 };
-function e0(i, e, t, a) {
-  a && i.getLayer(e) && (a.color && i.setPaintProperty(e, t, W(a.color)), a.visible !== void 0 && i.setLayoutProperty(e, "visibility", a.visible ? "visible" : "none"));
+function ee(a, e, t, i) {
+  i && a.getLayer(e) && (i.color && a.setPaintProperty(e, t, W(i.color)), i.visible !== void 0 && a.setLayoutProperty(e, "visibility", i.visible ? "visible" : "none"));
 }
-function t0(i, e) {
-  if (!(!i || !i.isStyleLoaded())) {
+function te(a, e) {
+  if (!(!a || !a.isStyleLoaded())) {
     if (e.landOcean) {
-      const { landColor: t, oceanColor: a, waterDepth: r, nationalPark: s } = e.landOcean;
-      i.getLayer(L.landColor.layerId) && i.setPaintProperty(L.landColor.layerId, "background-color", W(t)), i.getLayer(L.oceanColor.layerId) && i.setPaintProperty(L.oceanColor.layerId, "fill-color", W(a)), e0(i, L.waterDepth.layerId, "fill-color", r), e0(i, L.nationalPark.layerId, "fill-color", s);
+      const { landColor: t, oceanColor: i, waterDepth: r, nationalPark: l } = e.landOcean;
+      a.getLayer(E.landColor.layerId) && a.setPaintProperty(E.landColor.layerId, "background-color", W(t)), a.getLayer(E.oceanColor.layerId) && a.setPaintProperty(E.oceanColor.layerId, "fill-color", W(i)), ee(a, E.waterDepth.layerId, "fill-color", r), ee(a, E.nationalPark.layerId, "fill-color", l);
     }
-    e.transportation && (N(i, L.roads.layerId, e.transportation.roads), N(i, L.airports.layerId, e.transportation.airports)), e.boundaries && (N(i, L.countries.layerId, e.boundaries.countries), N(i, L.states.layerId, e.boundaries.states), N(i, L.counties.layerId, e.boundaries.counties)), e.waterFeatures && N(i, L.waterways.layerId, e.waterFeatures.waterways), e.labels && (B(i, L.continents.layerId, e.labels.continents), B(i, L.countriesLabels.layerId, e.labels.countries), B(i, L.statesLabels.layerId, e.labels.states), B(i, L.citiesMajor.layerId, e.labels.cities.major), B(i, L.citiesMinor.layerId, e.labels.cities.minor), B(i, L.airportsLabels.layerId, e.labels.airports), B(i, L.poi.layerId, e.labels.poi), B(i, L.waterLabels.layerId, e.labels.waterLabels), B(i, L.naturalLabels.layerId, e.labels.naturalLabels), B(i, L.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && i.getSource("mapbox-dem") && (e.terrain.visible ? (i.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), i.getLayer("hillshade") && (i.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), i.setPaintProperty("hillshade", "hillshade-shadow-color", W(e.terrain.shadowColor)), i.setPaintProperty("hillshade", "hillshade-highlight-color", W(e.terrain.highlightColor)), i.setPaintProperty("hillshade", "hillshade-accent-color", W(e.terrain.accentColor)))) : i.setTerrain(null));
+    e.transportation && (N(a, E.roads.layerId, e.transportation.roads), N(a, E.airports.layerId, e.transportation.airports)), e.boundaries && (N(a, E.countries.layerId, e.boundaries.countries), N(a, E.states.layerId, e.boundaries.states), N(a, E.counties.layerId, e.boundaries.counties)), e.waterFeatures && N(a, E.waterways.layerId, e.waterFeatures.waterways), e.labels && (G(a, E.continents.layerId, e.labels.continents), G(a, E.countriesLabels.layerId, e.labels.countries), G(a, E.statesLabels.layerId, e.labels.states), G(a, E.citiesMajor.layerId, e.labels.cities.major), G(a, E.citiesMinor.layerId, e.labels.cities.minor), G(a, E.airportsLabels.layerId, e.labels.airports), G(a, E.poi.layerId, e.labels.poi), G(a, E.waterLabels.layerId, e.labels.waterLabels), G(a, E.naturalLabels.layerId, e.labels.naturalLabels), G(a, E.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && a.getSource("mapbox-dem") && (e.terrain.visible ? (a.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), a.getLayer("hillshade") && (a.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), a.setPaintProperty("hillshade", "hillshade-shadow-color", W(e.terrain.shadowColor)), a.setPaintProperty("hillshade", "hillshade-highlight-color", W(e.terrain.highlightColor)), a.setPaintProperty("hillshade", "hillshade-accent-color", W(e.terrain.accentColor)))) : a.setTerrain(null));
   }
 }
-function Z(i, e) {
-  const t = { ...i };
-  return X(i) && X(e) && Object.keys(e).forEach((a) => {
-    X(e[a]) ? a in i ? t[a] = Z(i[a], e[a]) : Object.assign(t, { [a]: e[a] }) : Object.assign(t, { [a]: e[a] });
+function Y(a, e) {
+  const t = { ...a };
+  return X(a) && X(e) && Object.keys(e).forEach((i) => {
+    X(e[i]) ? i in a ? t[i] = Y(a[i], e[i]) : Object.assign(t, { [i]: e[i] }) : Object.assign(t, { [i]: e[i] });
   }), t;
 }
-function X(i) {
-  return i && typeof i == "object" && !Array.isArray(i);
+function X(a) {
+  return a && typeof a == "object" && !Array.isArray(a);
 }
-const p0 = "mapbox://styles/aguacerowx/cmfvox8mq004u01qm5nlg7qkt";
-class u0 extends i0 {
+const me = "mapbox://styles/aguacerowx/cmfvox8mq004u01qm5nlg7qkt";
+class ue extends ae {
   constructor(e, t = {}) {
     if (super(), !e || !t.accessToken)
       throw new Error("A container ID and a Mapbox access token are required.");
     mapboxgl.accessToken = t.accessToken;
-    let a = JSON.parse(JSON.stringify(K.light)), r = JSON.parse(JSON.stringify(K.dark));
-    t.customStyles && (console.log("[MapManager] Custom styles provided. Merging..."), t.customStyles.light && (a = Z(a, t.customStyles.light)), t.customStyles.dark && (r = Z(r, t.customStyles.dark)), console.log("[MapManager] Final merged dark theme:", r)), this.themes = {
-      light: a,
+    let i = JSON.parse(JSON.stringify(K.light)), r = JSON.parse(JSON.stringify(K.dark));
+    t.customStyles && (console.log("[MapManager] Custom styles provided. Merging..."), t.customStyles.light && (i = Y(i, t.customStyles.light)), t.customStyles.dark && (r = Y(r, t.customStyles.dark)), console.log("[MapManager] Final merged dark theme:", r)), this.themes = {
+      light: i,
       dark: r
     };
-    const s = t.defaultTheme || "light";
-    this.currentCustomizations = this.themes[s], this.currentThemeName = s, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
+    const l = t.defaultTheme || "light";
+    this.currentCustomizations = this.themes[l], this.currentThemeName = l, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
       container: e,
-      style: p0,
+      style: me,
       center: [-98, 39],
       zoom: 3.5,
       ...t.mapOptions
     }), this.map.on("load", () => {
-      console.log("[MapManager] Map loaded. Applying initial theme:", s), t0(this.map, this.currentCustomizations), this.emit("style:applied", {
+      console.log("[MapManager] Map loaded. Applying initial theme:", l), te(this.map, this.currentCustomizations), this.emit("style:applied", {
         themeName: this.currentThemeName,
         styles: this.currentCustomizations
       });
@@ -13632,35 +5710,35 @@ class u0 extends i0 {
   }
   // The rest of the methods (setTheme, setLabelGroupVisibility, etc.) are correct and remain unchanged...
   setTheme(e) {
-    var r, s, _;
+    var r, l, _;
     if (!this.themes[e]) {
       console.error(`[MapManager] Theme "${e}" does not exist.`);
       return;
     }
-    const t = JSON.parse(JSON.stringify(this.themes[e])), a = this.currentCustomizations.labels;
-    if (a)
-      for (const n in a) {
-        (r = a[n]) != null && r.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = a[n].visible);
-        for (const o in a[n])
-          (s = a[n][o]) != null && s.hasOwnProperty("visible") && ((_ = t.labels[n]) != null && _[o]) && (t.labels[n][o].visible = a[n][o].visible);
+    const t = JSON.parse(JSON.stringify(this.themes[e])), i = this.currentCustomizations.labels;
+    if (i)
+      for (const n in i) {
+        (r = i[n]) != null && r.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = i[n].visible);
+        for (const s in i[n])
+          (l = i[n][s]) != null && l.hasOwnProperty("visible") && ((_ = t.labels[n]) != null && _[s]) && (t.labels[n][s].visible = i[n][s].visible);
       }
-    this.currentCustomizations = t, this.currentThemeName = e, t0(this.map, this.currentCustomizations), this.emit("style:applied", {
+    this.currentCustomizations = t, this.currentThemeName = e, te(this.map, this.currentCustomizations), this.emit("style:applied", {
       themeName: this.currentThemeName,
       styles: this.currentCustomizations
     });
   }
   setLabelGroupVisibility(e, t) {
-    var o;
-    const a = `labels.${e}.visible`;
+    var s;
+    const i = `labels.${e}.visible`;
     let r = this.currentCustomizations;
-    const s = a.split(".");
-    for (let f = 0; f < s.length - 1; f++)
-      if (r = r[s[f]], !r) {
+    const l = i.split(".");
+    for (let c = 0; c < l.length - 1; c++)
+      if (r = r[l[c]], !r) {
         console.error(`Invalid label group key: ${e}`);
         return;
       }
-    r[s[s.length - 1]] = t;
-    const _ = e.replace(/\.(.)/g, (f, p) => p.toUpperCase()), n = (o = L[_]) == null ? void 0 : o.layerId;
+    r[l[l.length - 1]] = t;
+    const _ = e.replace(/\.(.)/g, (c, d) => d.toUpperCase()), n = (s = E[_]) == null ? void 0 : s.layerId;
     n && this.map.getLayer(n) ? (this.map.setLayoutProperty(n, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${n} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${_})`);
   }
   addWeatherManager(e) {
@@ -13671,6 +5749,6 @@ class u0 extends i0 {
   }
 }
 export {
-  h0 as FillLayerManager,
-  u0 as MapManager
+  he as FillLayerManager,
+  ue as MapManager
 };
