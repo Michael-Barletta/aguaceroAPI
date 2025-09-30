@@ -1,4 +1,4 @@
-class E {
+class L {
   constructor() {
     this.callbacks = {};
   }
@@ -6,8 +6,8 @@ class E {
     this.callbacks[e] || (this.callbacks[e] = []), this.callbacks[e].push(t);
   }
   emit(e, t) {
-    let i = this.callbacks[e];
-    i && i.forEach((n) => n(t));
+    let a = this.callbacks[e];
+    a && a.forEach((n) => n(t));
   }
 }
 class I {
@@ -19,7 +19,7 @@ class I {
   }
   onAdd(e, t) {
     this.map = e, this.gl = t;
-    const i = `
+    const a = `
             attribute vec2 a_position;
             attribute vec2 a_texCoord;
             uniform mat4 u_matrix;
@@ -97,7 +97,7 @@ class I {
                 if (color.a < 0.1) discard;
                 gl_FragColor = vec4(color.rgb, color.a * u_opacity);
             }`, r = t.createShader(t.VERTEX_SHADER);
-    t.shaderSource(r, i), t.compileShader(r);
+    t.shaderSource(r, a), t.compileShader(r);
     const o = t.createShader(t.FRAGMENT_SHADER);
     t.shaderSource(o, n), t.compileShader(o), t.getShaderParameter(o, t.COMPILE_STATUS) || console.error("Fragment shader failed to compile:", t.getShaderInfoLog(o)), this.program = t.createProgram(), t.attachShader(this.program, r), t.attachShader(this.program, o), t.linkProgram(this.program), t.getProgramParameter(this.program, t.LINK_STATUS) || console.error("Shader program failed to link:", t.getProgramInfoLog(this.program)), this.a_position = t.getAttribLocation(this.program, "a_position"), this.a_texCoord = t.getAttribLocation(this.program, "a_texCoord"), this.u_matrix = t.getUniformLocation(this.program, "u_matrix"), this.u_data_texture = t.getUniformLocation(this.program, "u_data_texture"), this.u_colormap_texture = t.getUniformLocation(this.program, "u_colormap_texture"), this.u_opacity = t.getUniformLocation(this.program, "u_opacity"), this.u_data_range = t.getUniformLocation(this.program, "u_data_range"), this.u_scale = t.getUniformLocation(this.program, "u_scale"), this.u_offset = t.getUniformLocation(this.program, "u_offset"), this.u_missing_quantized = t.getUniformLocation(this.program, "u_missing_quantized"), this.u_texture_size = t.getUniformLocation(this.program, "u_texture_size"), this.u_conversion_type = t.getUniformLocation(this.program, "u_conversion_type"), this.vertexBuffer = t.createBuffer(), this.indexBuffer = t.createBuffer(), this.dataTexture = t.createTexture(), this.colormapTexture = t.createTexture(), this.updateGeometry();
   }
@@ -105,52 +105,52 @@ class I {
   updateGeometry(e = { lon_tl: -180, lat_tl: 90, lon_tr: 180, lat_tr: 90, lon_bl: -180, lat_bl: -90, lon_br: 180, lat_br: -90 }) {
     const t = this.gl;
     if (!t) return;
-    const i = 120, n = [], r = [], o = 89.5;
-    for (let s = 0; s <= i; s++)
-      for (let c = 0; c <= i; c++) {
-        const _ = c / i, m = s / i, p = e.lon_tl + _ * (e.lon_tr - e.lon_tl);
-        let l = e.lat_tl + m * (e.lat_bl - e.lat_tl);
-        l = Math.max(-o, Math.min(o, l));
-        const f = mapboxgl.MercatorCoordinate.fromLngLat({ lon: p, lat: l }), u = _, h = m;
-        n.push(f.x, f.y, u, h);
+    const a = 120, n = [], r = [], o = 89.5;
+    for (let s = 0; s <= a; s++)
+      for (let c = 0; c <= a; c++) {
+        const l = c / a, m = s / a, p = e.lon_tl + l * (e.lon_tr - e.lon_tl);
+        let _ = e.lat_tl + m * (e.lat_bl - e.lat_tl);
+        _ = Math.max(-o, Math.min(o, _));
+        const d = mapboxgl.MercatorCoordinate.fromLngLat({ lon: p, lat: _ }), u = l, h = m;
+        n.push(d.x, d.y, u, h);
       }
-    for (let s = 0; s < i; s++)
-      for (let c = 0; c < i; c++) {
-        const _ = s * (i + 1) + c, m = _ + 1, p = (s + 1) * (i + 1) + c, l = p + 1;
-        r.push(_, p, m, m, p, l);
+    for (let s = 0; s < a; s++)
+      for (let c = 0; c < a; c++) {
+        const l = s * (a + 1) + c, m = l + 1, p = (s + 1) * (a + 1) + c, _ = p + 1;
+        r.push(l, p, m, m, p, _);
       }
     t.bindBuffer(t.ARRAY_BUFFER, this.vertexBuffer), t.bufferData(t.ARRAY_BUFFER, new Float32Array(n), t.STATIC_DRAW), t.bindBuffer(t.ELEMENT_ARRAY_BUFFER, this.indexBuffer), t.bufferData(t.ELEMENT_ARRAY_BUFFER, new Uint16Array(r), t.STATIC_DRAW), this.indexCount = r.length;
   }
   // This method remains unchanged
-  updateDataTexture(e, t, i, n) {
+  updateDataTexture(e, t, a, n) {
     const r = this.gl;
     if (!r) return;
-    this.encoding = t, this.textureWidth = i, this.textureHeight = n;
+    this.encoding = t, this.textureWidth = a, this.textureHeight = n;
     const o = new Uint8Array(e.length);
     for (let s = 0; s < e.length; s++) {
       const c = e[s] > 127 ? e[s] - 256 : e[s];
       o[s] = c + 128;
     }
-    r.bindTexture(r.TEXTURE_2D, this.dataTexture), r.pixelStorei(r.UNPACK_ALIGNMENT, 1), r.texImage2D(r.TEXTURE_2D, 0, r.LUMINANCE, i, n, 0, r.LUMINANCE, r.UNSIGNED_BYTE, o), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MIN_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MAG_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_S, r.CLAMP_TO_EDGE), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_T, r.CLAMP_TO_EDGE);
+    r.bindTexture(r.TEXTURE_2D, this.dataTexture), r.pixelStorei(r.UNPACK_ALIGNMENT, 1), r.texImage2D(r.TEXTURE_2D, 0, r.LUMINANCE, a, n, 0, r.LUMINANCE, r.UNSIGNED_BYTE, o), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MIN_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_MAG_FILTER, r.LINEAR), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_S, r.CLAMP_TO_EDGE), r.texParameteri(r.TEXTURE_2D, r.TEXTURE_WRAP_T, r.CLAMP_TO_EDGE);
   }
   // This method remains unchanged
   updateColormapTexture(e) {
     const t = this.gl;
     if (!t) return;
-    const i = 256, n = new Uint8Array(i * 4), r = [];
-    for (let l = 0; l < e.length; l += 2)
-      r.push({ value: e[l], color: e[l + 1] });
+    const a = 256, n = new Uint8Array(a * 4), r = [];
+    for (let _ = 0; _ < e.length; _ += 2)
+      r.push({ value: e[_], color: e[_ + 1] });
     if (r.length === 0) return;
-    const o = r[0].value, c = r[r.length - 1].value - o, _ = (l) => [parseInt(l.slice(1, 3), 16), parseInt(l.slice(3, 5), 16), parseInt(l.slice(5, 7), 16)], m = (l, f, u) => [Math.round(l[0] * (1 - u) + f[0] * u), Math.round(l[1] * (1 - u) + f[1] * u), Math.round(l[2] * (1 - u) + f[2] * u)];
+    const o = r[0].value, c = r[r.length - 1].value - o, l = (_) => [parseInt(_.slice(1, 3), 16), parseInt(_.slice(3, 5), 16), parseInt(_.slice(5, 7), 16)], m = (_, d, u) => [Math.round(_[0] * (1 - u) + d[0] * u), Math.round(_[1] * (1 - u) + d[1] * u), Math.round(_[2] * (1 - u) + d[2] * u)];
     let p = 0;
-    for (let l = 0; l < i; l++) {
-      const f = o + l / (i - 1) * c;
-      for (; p < r.length - 2 && f > r[p + 1].value; )
+    for (let _ = 0; _ < a; _++) {
+      const d = o + _ / (a - 1) * c;
+      for (; p < r.length - 2 && d > r[p + 1].value; )
         p++;
-      const u = r[p], h = r[p + 1], y = (f - u.value) / (h.value - u.value), v = m(_(u.color), _(h.color), y);
-      n[l * 4] = v[0], n[l * 4 + 1] = v[1], n[l * 4 + 2] = v[2], n[l * 4 + 3] = 255;
+      const u = r[p], h = r[p + 1], y = (d - u.value) / (h.value - u.value), v = m(l(u.color), l(h.color), y);
+      n[_ * 4] = v[0], n[_ * 4 + 1] = v[1], n[_ * 4 + 2] = v[2], n[_ * 4 + 3] = 255;
     }
-    t.bindTexture(t.TEXTURE_2D, this.colormapTexture), t.texImage2D(t.TEXTURE_2D, 0, t.RGBA, i, 1, 0, t.RGBA, t.UNSIGNED_BYTE, n), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_MIN_FILTER, t.LINEAR), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_S, t.CLAMP_TO_EDGE), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_T, t.CLAMP_TO_EDGE);
+    t.bindTexture(t.TEXTURE_2D, this.colormapTexture), t.texImage2D(t.TEXTURE_2D, 0, t.RGBA, a, 1, 0, t.RGBA, t.UNSIGNED_BYTE, n), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_MIN_FILTER, t.LINEAR), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_S, t.CLAMP_TO_EDGE), t.texParameteri(t.TEXTURE_2D, t.TEXTURE_WRAP_T, t.CLAMP_TO_EDGE);
   }
   // This method remains unchanged
   updateStyle({ opacity: e, dataRange: t }) {
@@ -162,9 +162,9 @@ class I {
    * @param {'metric'|'imperial'} targetSystem - The target display system.
    */
   setUnitConversion(e, t) {
-    let i = 0;
+    let a = 0;
     const n = (e || "").toLowerCase();
-    n.includes("c") || n.includes("f") ? t === "metric" ? i = 1 : t === "imperial" && (i = 2) : n === "kts" && (t === "imperial" ? i = 8 : t === "metric" && (i = 15)), this.currentConversion.type = i, this.map && this.map.triggerRepaint();
+    n.includes("c") || n.includes("f") ? t === "metric" ? a = 1 : t === "imperial" && (a = 2) : n === "kts" && (t === "imperial" ? a = 8 : t === "metric" && (a = 15)), this.currentConversion.type = a, this.map && this.map.triggerRepaint();
   }
   render(e, t) {
     !this.program || !this.encoding || !this.vertexBuffer || !this.indexBuffer || (e.useProgram(this.program), e.uniformMatrix4fv(this.u_matrix, !1, t), e.uniform1f(this.u_opacity, this.opacity), e.uniform2f(this.u_data_range, this.dataRange[0], this.dataRange[1]), e.uniform1f(this.u_scale, this.encoding.scale), e.uniform1f(this.u_offset, this.encoding.offset), e.uniform1f(this.u_missing_quantized, this.encoding.missing_quantized || 127), e.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight), e.uniform1i(this.u_conversion_type, this.currentConversion.type), e.activeTexture(e.TEXTURE0), e.bindTexture(e.TEXTURE_2D, this.dataTexture), e.uniform1i(this.u_data_texture, 0), e.activeTexture(e.TEXTURE1), e.bindTexture(e.TEXTURE_2D, this.colormapTexture), e.uniform1i(this.u_colormap_texture, 1), e.bindBuffer(e.ARRAY_BUFFER, this.vertexBuffer), e.enableVertexAttribArray(this.a_position), e.vertexAttribPointer(this.a_position, 2, e.FLOAT, !1, 16, 0), e.enableVertexAttribArray(this.a_texCoord), e.vertexAttribPointer(this.a_texCoord, 2, e.FLOAT, !1, 16, 8), e.bindBuffer(e.ELEMENT_ARRAY_BUFFER, this.indexBuffer), e.enable(e.BLEND), e.blendFunc(e.SRC_ALPHA, e.ONE_MINUS_SRC_ALPHA), e.drawElements(e.TRIANGLES, this.indexCount, e.UNSIGNED_SHORT, 0));
@@ -547,61 +547,61 @@ const A = {
     }
   }
 }, F = {
-  kelvin_to_celsius: (a) => a - 273.15,
-  kelvin_to_fahrenheit: (a) => (a - 273.15) * 9 / 5 + 32,
-  kelvin_to_c: (a) => a - 273.15,
-  kelvin_to_f: (a) => (a - 273.15) * 9 / 5 + 32,
-  k_to_celsius: (a) => a - 273.15,
-  k_to_fahrenheit: (a) => (a - 273.15) * 9 / 5 + 32,
-  k_to_c: (a) => a - 273.15,
-  k_to_f: (a) => (a - 273.15) * 9 / 5 + 32,
-  celsius_to_fahrenheit: (a) => a * 9 / 5 + 32,
-  celsius_to_f: (a) => a * 9 / 5 + 32,
-  c_to_fahrenheit: (a) => a * 9 / 5 + 32,
-  c_to_f: (a) => a * 9 / 5 + 32,
-  fahrenheit_to_celsius: (a) => (a - 32) * 5 / 9,
-  fahrenheit_to_c: (a) => (a - 32) * 5 / 9,
-  f_to_celsius: (a) => (a - 32) * 5 / 9,
-  f_to_c: (a) => (a - 32) * 5 / 9,
-  meters_to_feet: (a) => a * 3.28084,
-  meters_to_km: (a) => a / 1e3,
-  m_to_feet: (a) => a * 3.28084,
-  m_to_ft: (a) => a * 3.28084,
-  m_to_km: (a) => a / 1e3,
-  kts_to_mph: (a) => a * 1.15078,
-  mph_to_kts: (a) => a / 1.15078,
-  kts_to_ms: (a) => a / 1.94384449,
-  mph_to_ms: (a) => a / 2.23693629,
-  ms_to_mph: (a) => a * 2.23694,
-  ms_to_kts: (a) => a * 1.94384,
-  kts_to_kmh: (a) => a * 1.852,
-  mph_to_kmh: (a) => a * 1.60934,
-  ms_to_kmh: (a) => a * 3.6,
-  kmh_to_kts: (a) => a / 1.852,
-  kmh_to_mph: (a) => a / 1.60934,
-  kmh_to_ms: (a) => a / 3.6,
-  inches_to_mm: (a) => a * 25.4,
-  inches_to_cm: (a) => a * 2.54,
-  in_to_mm: (a) => a * 25.4,
-  in_to_cm: (a) => a * 2.54,
-  mm_to_in: (a) => a / 25.4,
-  mm_to_inches: (a) => a / 25.4,
-  cm_to_in: (a) => a / 2.54,
-  cm_to_inches: (a) => a / 2.54,
-  inhr_to_mmhr: (a) => a * 25.4,
-  inhr_to_cmhr: (a) => a * 2.54,
-  in_hr_to_mm_hr: (a) => a * 25.4,
-  in_hr_to_cm_hr: (a) => a * 2.54,
-  mmhr_to_inhr: (a) => a / 25.4,
-  cmhr_to_inhr: (a) => a / 2.54,
-  mm_hr_to_in_hr: (a) => a / 25.4,
-  cm_hr_to_in_hr: (a) => a / 2.54,
-  mmhr_to_cmhr: (a) => a / 10,
-  cmhr_to_mmhr: (a) => a * 10,
-  mm_hr_to_cm_hr: (a) => a / 10,
-  cm_hr_to_mm_hr: (a) => a * 10
+  kelvin_to_celsius: (i) => i - 273.15,
+  kelvin_to_fahrenheit: (i) => (i - 273.15) * 9 / 5 + 32,
+  kelvin_to_c: (i) => i - 273.15,
+  kelvin_to_f: (i) => (i - 273.15) * 9 / 5 + 32,
+  k_to_celsius: (i) => i - 273.15,
+  k_to_fahrenheit: (i) => (i - 273.15) * 9 / 5 + 32,
+  k_to_c: (i) => i - 273.15,
+  k_to_f: (i) => (i - 273.15) * 9 / 5 + 32,
+  celsius_to_fahrenheit: (i) => i * 9 / 5 + 32,
+  celsius_to_f: (i) => i * 9 / 5 + 32,
+  c_to_fahrenheit: (i) => i * 9 / 5 + 32,
+  c_to_f: (i) => i * 9 / 5 + 32,
+  fahrenheit_to_celsius: (i) => (i - 32) * 5 / 9,
+  fahrenheit_to_c: (i) => (i - 32) * 5 / 9,
+  f_to_celsius: (i) => (i - 32) * 5 / 9,
+  f_to_c: (i) => (i - 32) * 5 / 9,
+  meters_to_feet: (i) => i * 3.28084,
+  meters_to_km: (i) => i / 1e3,
+  m_to_feet: (i) => i * 3.28084,
+  m_to_ft: (i) => i * 3.28084,
+  m_to_km: (i) => i / 1e3,
+  kts_to_mph: (i) => i * 1.15078,
+  mph_to_kts: (i) => i / 1.15078,
+  kts_to_ms: (i) => i / 1.94384449,
+  mph_to_ms: (i) => i / 2.23693629,
+  ms_to_mph: (i) => i * 2.23694,
+  ms_to_kts: (i) => i * 1.94384,
+  kts_to_kmh: (i) => i * 1.852,
+  mph_to_kmh: (i) => i * 1.60934,
+  ms_to_kmh: (i) => i * 3.6,
+  kmh_to_kts: (i) => i / 1.852,
+  kmh_to_mph: (i) => i / 1.60934,
+  kmh_to_ms: (i) => i / 3.6,
+  inches_to_mm: (i) => i * 25.4,
+  inches_to_cm: (i) => i * 2.54,
+  in_to_mm: (i) => i * 25.4,
+  in_to_cm: (i) => i * 2.54,
+  mm_to_in: (i) => i / 25.4,
+  mm_to_inches: (i) => i / 25.4,
+  cm_to_in: (i) => i / 2.54,
+  cm_to_inches: (i) => i / 2.54,
+  inhr_to_mmhr: (i) => i * 25.4,
+  inhr_to_cmhr: (i) => i * 2.54,
+  in_hr_to_mm_hr: (i) => i * 25.4,
+  in_hr_to_cm_hr: (i) => i * 2.54,
+  mmhr_to_inhr: (i) => i / 25.4,
+  cmhr_to_inhr: (i) => i / 2.54,
+  mm_hr_to_in_hr: (i) => i / 25.4,
+  cm_hr_to_in_hr: (i) => i / 2.54,
+  mmhr_to_cmhr: (i) => i / 10,
+  cmhr_to_mmhr: (i) => i * 10,
+  mm_hr_to_cm_hr: (i) => i / 10,
+  cm_hr_to_mm_hr: (i) => i * 10
 };
-function z(a, e) {
+function H(i, e) {
   const t = {
     "°c": "c",
     "°f": "f",
@@ -631,14 +631,14 @@ function z(a, e) {
     "cm/hr": "cmhr",
     in: "in",
     inches: "in"
-  }, i = (s) => {
+  }, a = (s) => {
     if (!s) return "";
     const c = s.toLowerCase().trim();
     return t[c] || c;
-  }, n = i(a), r = i(e), o = `${n}_to_${r}`;
+  }, n = a(i), r = a(e), o = `${n}_to_${r}`;
   return F[o] || null;
 }
-const H = {
+const E = {
   mrms: {
     vars: [
       "MergedReflectivityQCComposite_00.50",
@@ -12851,186 +12851,12 @@ const H = {
       }
     }
   }
-}, D = `
-:root {
-    --aguacero-bg-color: #ffffff;
-    --aguacero-text-color: #333333;
-    --aguacero-border-color: #cccccc;
-    --aguacero-shadow-color: rgba(0, 0, 0, 0.1);
-    --aguacero-accent-color: #007bff;
-    --aguacero-hover-bg-color: #f8f9fa;
-    --aguacero-active-bg-color: #e9ecef;
-    --aguacero-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-/* Base style for all Aguacero panels */
-.aguacero-panel {
-    background-color: var(--aguacero-bg-color);
-    color: var(--aguacero-text-color);
-    font-family: var(--aguacero-font-family);
-    font-size: 14px;
-    border-radius: 4px;
-    box-shadow: 0 1px 3px var(--aguacero-shadow-color);
-    margin: 10px;
-    padding: 12px;
-    border: 1px solid var(--aguacero-border-color);
-    line-height: 1.5;
-}
-
-.aguacero-panel-label {
-    font-weight: bold;
-    display: block;
-    margin-bottom: 8px;
-    color: #555;
-}
-
-/* Layer Control Panel Specifics */
-.aguacero-layer-control .aguacero-panel-header {
-    font-size: 16px;
-    font-weight: bold;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--aguacero-border-color);
-}
-
-.aguacero-layer-category, .aguacero-layer-subcategory {
-    margin-bottom: 5px;
-}
-
-.aguacero-layer-header, .aguacero-layer-subheader {
-    font-weight: bold;
-    cursor: pointer;
-    padding: 6px 8px;
-    border-radius: 3px;
-    transition: background-color 0.2s;
-}
-
-.aguacero-layer-header:hover, .aguacero-layer-subheader:hover {
-    background-color: var(--aguacero-hover-bg-color);
-}
-
-.aguacero-layer-header::before, .aguacero-layer-subheader::before {
-    content: '▸ ';
-    display: inline-block;
-    transition: transform 0.2s;
-}
-
-.aguacero-layer-category.open > .aguacero-layer-header::before,
-.aguacero-layer-subcategory.open > .aguacero-layer-subheader::before {
-    transform: rotate(90deg);
-}
-
-.aguacero-layer-content, .aguacero-layer-items {
-    display: none; /* Hidden by default */
-    padding-left: 15px;
-}
-
-.aguacero-layer-category.open > .aguacero-layer-content,
-.aguacero-layer-subcategory.open > .aguacero-layer-items {
-    display: block; /* Shown when open */
-}
-
-.aguacero-layer-item {
-    padding: 5px 8px;
-    cursor: pointer;
-    border-radius: 3px;
-    margin: 2px 0;
-}
-
-.aguacero-layer-item:hover {
-    background-color: var(--aguacero-hover-bg-color);
-}
-
-.aguacero-layer-item.active {
-    background-color: var(--aguacero-accent-color);
-    color: white;
-    font-weight: bold;
-}
-
-// In the aguaceroCSS string, REPLACE the old legend styles with these:
-
-/* Legend Panel Specifics (Horizontal Layout) */
-.aguacero-legend-panel {
-    position: absolute;
-    background-color: var(--aguacero-bg-color);
-    color: var(--aguacero-text-color);
-    font-family: var(--aguacero-font-family);
-    padding: 10px 15px;
-    border-radius: var(--aguacero-border-radius);
-    box-shadow: 0 1px 3px var(--aguacero-shadow-color);
-    border: 1px solid var(--aguacero-border-color);
-    font-size: 12px;
-    /* Allow the panel to be wider */
-    width: 250px; 
-    max-width: 90%;
-}
-
-.aguacero-legend-bottom-right { bottom: 20px; right: 10px; }
-.aguacero-legend-bottom-left { bottom: 20px; left: 10px; }
-.aguacero-legend-top-right { top: 20px; right: 10px; }
-.aguacero-legend-top-left { top: 20px; left: 10px; }
-
-.aguacero-legend-title {
-    margin: 0 0 10px 0;
-    font-weight: bold;
-    font-size: 14px;
-    text-align: center;
-}
-
-.aguacero-legend-body {
-    display: flex;
-    flex-direction: column;
-}
-
-/* The continuous gradient bar */
-.aguacero-legend-gradient {
-    height: 15px;
-    width: 100%;
-    border-radius: 3px;
-    border: 1px solid rgba(0,0,0,0.1);
-}
-
-/* Container for the labels below the bar */
-.aguacero-legend-labels {
-    display: flex;
-    justify-content: space-between; /* Evenly space the min and max labels */
-    margin-top: 5px;
-    font-size: 11px;
-}
-
-/* Slider Panel Specifics */
-.aguacero-slider-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.aguacero-slider-input {
-    flex-grow: 1; /* Make the slider track take up remaining space */
-}
-
-.aguacero-slider-controls {
-    display: flex;
-    gap: 5px;
-}
-
-.aguacero-slider-controls .aguacero-button {
-    padding: 4px 8px;
-    font-size: 14px;
-    line-height: 1;
-}
-`;
-function N() {
-  if (document.getElementById("aguacero-styles"))
-    return;
-  const a = document.createElement("style");
-  a.id = "aguacero-styles", a.innerHTML = D, document.head.appendChild(a);
-}
-function T(a, e) {
-  const t = a?.[e];
+};
+function C(i, e) {
+  const t = i?.[e];
   if (!t) return null;
-  const i = Object.keys(t).sort((n, r) => r.localeCompare(n));
-  for (const n of i) {
+  const a = Object.keys(t).sort((n, r) => r.localeCompare(n));
+  for (const n of a) {
     const r = t[n];
     if (!r) continue;
     const o = Object.keys(r).sort((s, c) => c.localeCompare(s));
@@ -13038,40 +12864,137 @@ function T(a, e) {
   }
   return null;
 }
-class G extends E {
+class B extends L {
   constructor(e, t = {}) {
     if (super(), !e) throw new Error("A Mapbox GL map instance is required.");
-    N(), this.map = e, this.layers = /* @__PURE__ */ new Map(), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`, this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.dataCache = /* @__PURE__ */ new Map(), this.customColormaps = t.customColormaps || {};
-    const i = t.layerOptions || {}, n = i.variable || "2t_2", { colormap: r, baseUnit: o } = this._getColormapForVariable(n);
+    this.map = e, this.layers = /* @__PURE__ */ new Map(), this.layerId = t.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`, this.baseUrl = "https://d3dc62msmxkrd7.cloudfront.net/grids", this.worker = this.createWorker(), this.workerRequestId = 0, this.workerResolvers = /* @__PURE__ */ new Map(), this.worker.addEventListener("message", this._handleWorkerMessage.bind(this)), this.statusUrl = "https://d3dc62msmxkrd7.cloudfront.net/model-status", this.modelStatus = null, this.loadStrategy = t.loadStrategy || "on-demand", this.dataCache = /* @__PURE__ */ new Map(), this.isPlaying = !1, this.playIntervalId = null, this.playbackSpeed = t.playbackSpeed || 500, this.customColormaps = t.customColormaps || {};
+    const a = t.layerOptions || {}, n = a.variable || "2t_2", { colormap: r, baseUnit: o } = this._getColormapForVariable(n);
     this.baseLayerOptions = {
-      ...i,
+      ...a,
       variable: n,
       colormap: r,
       colormapBaseUnit: o
     }, this.state = {
-      model: i.model || "gfs",
+      model: a.model || "gfs",
       variable: n,
       date: null,
       run: null,
       forecastHour: 0,
       visible: !0,
-      opacity: i.opacity ?? 1,
+      opacity: a.opacity ?? 1,
       units: t.initialUnit || "imperial"
     }, this.autoRefreshEnabled = t.autoRefresh ?? !1, this.autoRefreshIntervalSeconds = t.autoRefreshInterval ?? 60, this.autoRefreshIntervalId = null;
   }
-  // --- START OF FIX ---
   /**
-   * NEW METHOD: A central router for all messages coming from the web worker.
-   * It uses the requestId to resolve the correct promise.
-   * @private
+   * Gets the available variables for a specific model
+   * @param {string} modelName - The model to get variables for
+   * @returns {Array<string>} Array of variable codes
    */
+  getAvailableVariables(e = null) {
+    const t = e || this.state.model;
+    return E[t]?.vars || [];
+  }
+  /**
+   * Gets a human-readable name for a variable
+   * @param {string} variableCode - The variable code (e.g., '2t_2')
+   * @returns {string} Human-readable name
+   */
+  getVariableDisplayName(e) {
+    const t = R.fld[e];
+    return t?.displayName || t?.name || e;
+  }
   _handleWorkerMessage(e) {
-    const { success: t, requestId: i, decompressedData: n, encoding: r, error: o } = e.data;
-    if (this.workerResolvers.has(i)) {
-      const { resolve: s, reject: c } = this.workerResolvers.get(i);
-      t ? s({ data: n, encoding: r }) : c(new Error(o)), this.workerResolvers.delete(i);
+    const { success: t, requestId: a, decompressedData: n, encoding: r, error: o } = e.data;
+    if (this.workerResolvers.has(a)) {
+      const { resolve: s, reject: c } = this.workerResolvers.get(a);
+      t ? s({ data: n, encoding: r }) : c(new Error(o)), this.workerResolvers.delete(a);
     }
   }
+  // ========================================================================
+  // --- PUBLIC API METHODS ---
+  // ========================================================================
+  play() {
+    this.isPlaying || (this.isPlaying = !0, clearInterval(this.playIntervalId), this.playIntervalId = setInterval(() => {
+      this.step(1);
+    }, this.playbackSpeed), this.emit("playback:start", { speed: this.playbackSpeed }));
+  }
+  pause() {
+    this.isPlaying && (this.isPlaying = !1, clearInterval(this.playIntervalId), this.playIntervalId = null, this.emit("playback:stop"));
+  }
+  togglePlay() {
+    this.isPlaying ? this.pause() : this.play();
+  }
+  step(e = 1) {
+    const { model: t, date: a, run: n, forecastHour: r } = this.state, o = this.modelStatus?.[t]?.[a]?.[n];
+    if (!o || o.length === 0) return;
+    const s = o.indexOf(r);
+    if (s === -1) return;
+    const c = o.length - 1;
+    let l = s + e;
+    l > c && (l = 0), l < 0 && (l = c), this.setState({ forecastHour: o[l] });
+  }
+  setPlaybackSpeed(e) {
+    e > 0 && (this.playbackSpeed = e, this.isPlaying && this.play());
+  }
+  async setState(e) {
+    const t = e.model && e.model !== this.state.model, a = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), n = e.variable && e.variable !== this.state.variable;
+    Object.assign(this.state, e), (t || a || n) && (this.layers.has(this.layerId) && (this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 }), this.map.triggerRepaint()), this.dataCache.clear());
+    const r = this.baseLayerOptions.colormap, o = this.baseLayerOptions.colormapBaseUnit, s = this._getTargetUnit(o, this.state.units), c = this._convertColormapUnits(r, o, s), { model: l, date: m, run: p } = this.state;
+    this.emit("state:change", {
+      ...this.state,
+      availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
+      availableRuns: this.modelStatus?.[l] || {},
+      availableHours: this.modelStatus?.[l]?.[m]?.[p] || [],
+      availableVariables: this.getAvailableVariables(),
+      isPlaying: this.isPlaying,
+      colormap: c,
+      // Use the converted colormap
+      colormapBaseUnit: s
+      // And its corresponding unit name
+    }), this._loadAndRenderGrid(this.state), (t || a || n) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
+  }
+  /**
+   * A helper method to consolidate loading and rendering logic.
+   * @private
+   */
+  async _loadAndRenderGrid(e) {
+    const t = await this._loadGridData(e);
+    if (t && t.data) {
+      const a = { ...this.baseLayerOptions, ...e };
+      this._updateOrCreateLayer(this.layerId, a, t.data, t.encoding);
+    } else
+      this.removeLayer(this.layerId);
+  }
+  /**
+   * Sets the active weather variable for the layer.
+   * @param {string} newVariable - The name of the variable to display (e.g., 'refc_0').
+   */
+  async setVariable(e) {
+    if (e === this.state.variable) return;
+    const { colormap: t, baseUnit: a } = this._getColormapForVariable(e);
+    this.baseLayerOptions.variable = e, this.baseLayerOptions.colormap = t, this.baseLayerOptions.colormapBaseUnit = a, await this.setState({ variable: e, forecastHour: 0 });
+  }
+  async setModel(e) {
+    if (e === this.state.model || !this.modelStatus || !this.modelStatus[e]) return;
+    const t = C(this.modelStatus, e);
+    t && await this.setState({ model: e, date: t.date, run: t.run, forecastHour: 0 });
+  }
+  async setRun(e) {
+    const [t, a] = e.split(":");
+    (t !== this.state.date || a !== this.state.run) && await this.setState({ date: t, run: a, forecastHour: 0 });
+  }
+  async setUnits(e) {
+    e === this.state.units || !["metric", "imperial"].includes(e) || await this.setState({ units: e });
+  }
+  async initialize(e = {}) {
+    await this.fetchModelStatus(!0);
+    const t = C(this.modelStatus, this.state.model);
+    let a = this.state;
+    t && (a = { ...this.state, ...t, forecastHour: 0 }), await this.setState(a), (e.autoRefresh ?? this.autoRefreshEnabled) && this.startAutoRefresh(e.refreshInterval ?? this.autoRefreshIntervalSeconds);
+  }
+  // ========================================================================
+  // --- PRIVATE HELPER METHODS ---
+  // ========================================================================
   _getColormapForVariable(e) {
     const t = this.customColormaps[e];
     if (t) {
@@ -13091,7 +13014,7 @@ class G extends E {
           baseUnit: t.baseUnit
         };
     }
-    const i = R.variable_cmap?.[e] || e, n = U[i];
+    const a = R.variable_cmap?.[e] || e, n = U[a];
     if (n) {
       const r = Object.keys(n.units)[0];
       return {
@@ -13104,23 +13027,23 @@ class G extends E {
       baseUnit: "unknown"
     };
   }
-  _convertColormapUnits(e, t, i) {
-    if (t === i) return e;
-    const n = z(t, i);
+  _convertColormapUnits(e, t, a) {
+    if (t === a) return e;
+    const n = H(t, a);
     if (!n) return e;
     const r = [];
     for (let o = 0; o < e.length; o += 2)
       r.push(n(e[o]), e[o + 1]);
     return r;
   }
-  _updateOrCreateLayer(e, t, i, n) {
-    const { model: r, colormap: o, opacity: s = 1, visible: c = !0, units: _, variable: m } = t, p = A[r];
+  _updateOrCreateLayer(e, t, a, n) {
+    const { model: r, colormap: o, opacity: s = 1, visible: c = !0, units: l, variable: m } = t, p = A[r];
     if (!p) {
       console.error(`No grid configuration found for model: ${r}`);
       return;
     }
-    const l = t.colormapBaseUnit, f = R.fld[m] || {}, u = this._getTargetUnit(l, _), h = this._convertColormapUnits(o, l, u), y = [h[0], h[h.length - 2]], v = f.defaultUnit || "none", k = this.layers.has(e), w = k ? this.layers.get(e).shaderLayer : new I(e);
-    k || (this.map.addLayer(w, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: w, options: t, visible: c })), w.updateDataTexture(i, n, p.grid_params.nx, p.grid_params.ny), w.updateColormapTexture(h), w.updateStyle({ opacity: c ? s : 0, dataRange: y }), w.setUnitConversion(v, _), this.map.triggerRepaint();
+    const _ = t.colormapBaseUnit, d = R.fld[m] || {}, u = this._getTargetUnit(_, l), h = this._convertColormapUnits(o, _, u), y = [h[0], h[h.length - 2]], v = d.defaultUnit || "none", k = this.layers.has(e), w = k ? this.layers.get(e).shaderLayer : new I(e);
+    k || (this.map.addLayer(w, "AML_-_terrain"), this.layers.set(e, { id: e, shaderLayer: w, options: t, visible: c })), w.updateDataTexture(a, n, p.grid_params.nx, p.grid_params.ny), w.updateColormapTexture(h), w.updateStyle({ opacity: c ? s : 0, dataRange: y }), w.setUnitConversion(v, l), this.map.triggerRepaint();
   }
   /**
    * Helper to determine the target unit string for a given system.
@@ -13134,36 +13057,13 @@ class G extends E {
     }
     return ["°F", "°C"].includes(e) ? "fahrenheit" : ["kts", "mph", "m/s"].includes(e) ? "mph" : ["in", "mm", "cm"].includes(e) ? "in" : e;
   }
-  // ========================================================================
-  // --- THIS ENTIRE FUNCTION WAS MISSING IN THE PREVIOUS RESPONSE ---
-  // ========================================================================
-  /**
-   * Sets the active weather variable for the layer.
-   * @param {string} newVariable - The name of the variable to display (e.g., 'refc_0').
-   */
-  async setVariable(e) {
-    if (e === this.state.variable) return;
-    const { colormap: t, baseUnit: i } = this._getColormapForVariable(e);
-    this.baseLayerOptions.variable = e, this.baseLayerOptions.colormap = t, this.baseLayerOptions.colormapBaseUnit = i, await this.setState({ variable: e });
-  }
-  async setState(e) {
-    const t = e.model && e.model !== this.state.model, i = e.date && e.run && (e.date !== this.state.date || e.run !== this.state.run), n = e.variable && e.variable !== this.state.variable;
-    (t || i || n) && this.dataCache.clear(), Object.assign(this.state, e);
-    const r = await this._loadGridData(this.state);
-    if (r && r.data) {
-      const o = { ...this.baseLayerOptions, ...this.state };
-      this._updateOrCreateLayer(this.layerId, o, r.data, r.encoding);
-    } else
-      this.removeLayer(this.layerId);
-    this.emit("state:change", this.state), (t || i || n) && this.loadStrategy === "preload" && setTimeout(() => this._preloadCurrentRun(), 0);
-  }
   async setModel(e) {
     if (e === this.state.model) return;
     if (!this.modelStatus || !this.modelStatus[e]) {
       console.error(`[Manager] Model "${e}" is not available.`);
       return;
     }
-    const t = T(this.modelStatus, e);
+    const t = C(this.modelStatus, e);
     t ? await this.setState({
       model: e,
       date: t.date,
@@ -13223,7 +13123,7 @@ class G extends E {
    */
   // Replace the existing _preloadCurrentRun method with this one.
   async _preloadCurrentRun() {
-    const { model: e, date: t, run: i } = this.state, n = this.modelStatus?.[e]?.[t]?.[i];
+    const { model: e, date: t, run: a } = this.state, n = this.modelStatus?.[e]?.[t]?.[a];
     if (!n || n.length === 0)
       return;
     const r = n.map((o) => {
@@ -13243,8 +13143,8 @@ class G extends E {
         const t = await fetch(this.statusUrl);
         if (!t.ok)
           throw new Error(`HTTP error! Status: ${t.status}`);
-        const i = await t.json();
-        this.modelStatus = i.models;
+        const a = await t.json();
+        this.modelStatus = a.models;
       } catch {
         this.modelStatus = null;
       }
@@ -13267,37 +13167,37 @@ class G extends E {
     this.autoRefreshIntervalId && (clearInterval(this.autoRefreshIntervalId), this.autoRefreshIntervalId = null);
   }
   async _loadGridData(e) {
-    const { model: t, date: i, run: n, forecastHour: r, variable: o, smoothing: s } = { ...this.baseLayerOptions, ...e }, c = `${t}-${i}-${n}-${r}-${o}-${s || ""}`;
+    const { model: t, date: a, run: n, forecastHour: r, variable: o, smoothing: s = 0 } = { ...this.baseLayerOptions, ...e }, c = `${t}-${a}-${n}-${r}-${o}-${s || ""}`;
     if (this.dataCache.has(c))
       return this.dataCache.get(c);
-    const _ = new Promise(async (m, p) => {
-      const l = `${this.baseUrl}/${t}/${i}/${n}/${r}/${o}/${s}`;
+    const l = new Promise(async (m, p) => {
+      const _ = `${this.baseUrl}/${t}/${a}/${n}/${r}/${o}/${s}`;
       try {
-        const f = await fetch(l);
-        if (!f.ok) throw new Error(`HTTP ${f.status} for ${l}`);
-        const { data: u, encoding: h } = await f.json(), y = Uint8Array.from(atob(u), (k) => k.charCodeAt(0)), v = this.workerRequestId++;
+        const d = await fetch(_);
+        if (!d.ok) throw new Error(`HTTP ${d.status} for ${_}`);
+        const { data: u, encoding: h } = await d.json(), y = Uint8Array.from(atob(u), (k) => k.charCodeAt(0)), v = this.workerRequestId++;
         this.workerResolvers.set(v, { resolve: m, reject: p }), this.worker.postMessage({ requestId: v, compressedData: y, encoding: h }, [y.buffer]);
-      } catch (f) {
-        p(f);
+      } catch (d) {
+        p(d);
       }
     }).then((m) => (this.dataCache.set(c, m), m)).catch((m) => (this.dataCache.delete(c), null));
-    return this.dataCache.set(c, _), _;
+    return this.dataCache.set(c, l), l;
   }
   async setUnits(e) {
     e === this.state.units || !["metric", "imperial"].includes(e) || await this.setState({ units: e });
   }
-  async initialize(e = {}) {
-    const t = await this.fetchModelStatus(), i = T(t, this.state.model);
-    if (i ? await this.setState({ ...i, forecastHour: 0 }) : (console.error(`Could not initialize. No runs found for model "${this.state.model}".`), this.emit("state:change", this.state)), e.autoRefresh ?? this.autoRefreshEnabled) {
-      const r = e.refreshInterval ?? this.autoRefreshIntervalSeconds;
-      this.startAutoRefresh(r);
-    }
-  }
   removeLayer(e) {
     this.layers.has(e) && (this.map.getLayer(e) && this.map.removeLayer(e), this.layers.delete(e));
   }
+  /**
+   * Cleans up all resources used by the manager.
+   * Removes the layer from the map, stops timers, and clears caches.
+   */
+  destroy() {
+    this.pause(), this.stopAutoRefresh(), this.removeLayer(this.layerId), this.dataCache.clear(), this.worker.terminate(), this.callbacks = {}, console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
+  }
 }
-const W = {
+const D = {
   landOcean: {
     landColor: "#f0f0f0",
     oceanColor: "#a8d8ea",
@@ -13344,7 +13244,7 @@ const W = {
     accentColor: "#b0b0b0"
   },
   oceanOnTop: !1
-}, V = {
+}, W = {
   landOcean: {
     landColor: "#242424",
     oceanColor: "#252525",
@@ -13391,10 +13291,10 @@ const W = {
     accentColor: "#000000"
   },
   oceanOnTop: !1
-}, L = {
-  light: W,
-  dark: V
-}, d = {
+}, P = {
+  light: D,
+  dark: W
+}, f = {
   // Background and water layers
   landColor: { layerId: "AML_-_land" },
   oceanColor: { layerId: "AML_-_water" },
@@ -13421,58 +13321,58 @@ const W = {
   // Assuming point label for natural features
   subdivisionLabels: { layerId: "AML_-_subdivision-label" }
 };
-function b(a) {
-  return typeof a == "string" && a.startsWith("#") && a.length === 9 ? a.substring(0, 7) : a;
+function b(i) {
+  return typeof i == "string" && i.startsWith("#") && i.length === 9 ? i.substring(0, 7) : i;
 }
-const x = (a, e, t) => {
-  if (a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "line-color", b(t.color)), a.setPaintProperty(e, "line-width", t.width), t.lineType)) {
-    const i = { dashed: [2, 2], dotted: [0, 2], solid: [] };
-    a.setPaintProperty(e, "line-dasharray", i[t.lineType] || []);
+const x = (i, e, t) => {
+  if (i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "line-color", b(t.color)), i.setPaintProperty(e, "line-width", t.width), t.lineType)) {
+    const a = { dashed: [2, 2], dotted: [0, 2], solid: [] };
+    i.setPaintProperty(e, "line-dasharray", a[t.lineType] || []);
   }
-}, g = (a, e, t) => {
-  a.getLayer(e) && (a.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), a.setPaintProperty(e, "text-color", b(t.color)), a.setPaintProperty(e, "text-halo-color", b(t.outlineColor)), a.setPaintProperty(e, "text-halo-width", t.outlineWidth), a.setLayoutProperty(e, "text-size", t.fontSize), a.setLayoutProperty(e, "text-font", [t.fontFamily]));
+}, g = (i, e, t) => {
+  i.getLayer(e) && (i.setLayoutProperty(e, "visibility", t.visible ? "visible" : "none"), i.setPaintProperty(e, "text-color", b(t.color)), i.setPaintProperty(e, "text-halo-color", b(t.outlineColor)), i.setPaintProperty(e, "text-halo-width", t.outlineWidth), i.setLayoutProperty(e, "text-size", t.fontSize), i.setLayoutProperty(e, "text-font", [t.fontFamily]));
 };
-function P(a, e, t, i) {
-  i && a.getLayer(e) && (i.color && a.setPaintProperty(e, t, b(i.color)), i.visible !== void 0 && a.setLayoutProperty(e, "visibility", i.visible ? "visible" : "none"));
+function M(i, e, t, a) {
+  a && i.getLayer(e) && (a.color && i.setPaintProperty(e, t, b(a.color)), a.visible !== void 0 && i.setLayoutProperty(e, "visibility", a.visible ? "visible" : "none"));
 }
-function M(a, e) {
-  if (!(!a || !a.isStyleLoaded())) {
+function z(i, e) {
+  if (!(!i || !i.isStyleLoaded())) {
     if (e.landOcean) {
-      const { landColor: t, oceanColor: i, waterDepth: n, nationalPark: r } = e.landOcean;
-      a.getLayer(d.landColor.layerId) && a.setPaintProperty(d.landColor.layerId, "background-color", b(t)), a.getLayer(d.oceanColor.layerId) && a.setPaintProperty(d.oceanColor.layerId, "fill-color", b(i)), P(a, d.waterDepth.layerId, "fill-color", n), P(a, d.nationalPark.layerId, "fill-color", r);
+      const { landColor: t, oceanColor: a, waterDepth: n, nationalPark: r } = e.landOcean;
+      i.getLayer(f.landColor.layerId) && i.setPaintProperty(f.landColor.layerId, "background-color", b(t)), i.getLayer(f.oceanColor.layerId) && i.setPaintProperty(f.oceanColor.layerId, "fill-color", b(a)), M(i, f.waterDepth.layerId, "fill-color", n), M(i, f.nationalPark.layerId, "fill-color", r);
     }
-    e.transportation && (x(a, d.roads.layerId, e.transportation.roads), x(a, d.airports.layerId, e.transportation.airports)), e.boundaries && (x(a, d.countries.layerId, e.boundaries.countries), x(a, d.states.layerId, e.boundaries.states), x(a, d.counties.layerId, e.boundaries.counties)), e.waterFeatures && x(a, d.waterways.layerId, e.waterFeatures.waterways), e.labels && (g(a, d.continents.layerId, e.labels.continents), g(a, d.countriesLabels.layerId, e.labels.countries), g(a, d.statesLabels.layerId, e.labels.states), g(a, d.citiesMajor.layerId, e.labels.cities.major), g(a, d.citiesMinor.layerId, e.labels.cities.minor), g(a, d.airportsLabels.layerId, e.labels.airports), g(a, d.poi.layerId, e.labels.poi), g(a, d.waterLabels.layerId, e.labels.waterLabels), g(a, d.naturalLabels.layerId, e.labels.naturalLabels), g(a, d.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && a.getSource("mapbox-dem") && (e.terrain.visible ? (a.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), a.getLayer("hillshade") && (a.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), a.setPaintProperty("hillshade", "hillshade-shadow-color", b(e.terrain.shadowColor)), a.setPaintProperty("hillshade", "hillshade-highlight-color", b(e.terrain.highlightColor)), a.setPaintProperty("hillshade", "hillshade-accent-color", b(e.terrain.accentColor)))) : a.setTerrain(null));
+    e.transportation && (x(i, f.roads.layerId, e.transportation.roads), x(i, f.airports.layerId, e.transportation.airports)), e.boundaries && (x(i, f.countries.layerId, e.boundaries.countries), x(i, f.states.layerId, e.boundaries.states), x(i, f.counties.layerId, e.boundaries.counties)), e.waterFeatures && x(i, f.waterways.layerId, e.waterFeatures.waterways), e.labels && (g(i, f.continents.layerId, e.labels.continents), g(i, f.countriesLabels.layerId, e.labels.countries), g(i, f.statesLabels.layerId, e.labels.states), g(i, f.citiesMajor.layerId, e.labels.cities.major), g(i, f.citiesMinor.layerId, e.labels.cities.minor), g(i, f.airportsLabels.layerId, e.labels.airports), g(i, f.poi.layerId, e.labels.poi), g(i, f.waterLabels.layerId, e.labels.waterLabels), g(i, f.naturalLabels.layerId, e.labels.naturalLabels), g(i, f.subdivisionLabels.layerId, e.labels.subdivisionLabels)), e.terrain && i.getSource("mapbox-dem") && (e.terrain.visible ? (i.setTerrain({ source: "mapbox-dem", exaggeration: 1 }), i.getLayer("hillshade") && (i.setPaintProperty("hillshade", "hillshade-exaggeration", e.terrain.intensity), i.setPaintProperty("hillshade", "hillshade-shadow-color", b(e.terrain.shadowColor)), i.setPaintProperty("hillshade", "hillshade-highlight-color", b(e.terrain.highlightColor)), i.setPaintProperty("hillshade", "hillshade-accent-color", b(e.terrain.accentColor)))) : i.setTerrain(null));
   }
 }
-function S(a, e) {
-  const t = { ...a };
-  return C(a) && C(e) && Object.keys(e).forEach((i) => {
-    C(e[i]) ? i in a ? t[i] = S(a[i], e[i]) : Object.assign(t, { [i]: e[i] }) : Object.assign(t, { [i]: e[i] });
+function T(i, e) {
+  const t = { ...i };
+  return S(i) && S(e) && Object.keys(e).forEach((a) => {
+    S(e[a]) ? a in i ? t[a] = T(i[a], e[a]) : Object.assign(t, { [a]: e[a] }) : Object.assign(t, { [a]: e[a] });
   }), t;
 }
-function C(a) {
-  return a && typeof a == "object" && !Array.isArray(a);
+function S(i) {
+  return i && typeof i == "object" && !Array.isArray(i);
 }
-const B = "mapbox://styles/aguacerowx/cmfvox8mq004u01qm5nlg7qkt";
-class O extends E {
+const V = "mapbox://styles/aguacerowx/cmfvox8mq004u01qm5nlg7qkt";
+class N extends L {
   constructor(e, t = {}) {
     if (super(), !e || !t.accessToken)
       throw new Error("A container ID and a Mapbox access token are required.");
     mapboxgl.accessToken = t.accessToken;
-    let i = JSON.parse(JSON.stringify(L.light)), n = JSON.parse(JSON.stringify(L.dark));
-    t.customStyles && (console.log("[MapManager] Custom styles provided. Merging..."), t.customStyles.light && (i = S(i, t.customStyles.light)), t.customStyles.dark && (n = S(n, t.customStyles.dark)), console.log("[MapManager] Final merged dark theme:", n)), this.themes = {
-      light: i,
+    let a = JSON.parse(JSON.stringify(P.light)), n = JSON.parse(JSON.stringify(P.dark));
+    t.customStyles && (console.log("[MapManager] Custom styles provided. Merging..."), t.customStyles.light && (a = T(a, t.customStyles.light)), t.customStyles.dark && (n = T(n, t.customStyles.dark)), console.log("[MapManager] Final merged dark theme:", n)), this.themes = {
+      light: a,
       dark: n
     };
     const r = t.defaultTheme || "light";
     this.currentCustomizations = this.themes[r], this.currentThemeName = r, this.weatherLayerManagers = /* @__PURE__ */ new Map(), this.map = new mapboxgl.Map({
       container: e,
-      style: B,
+      style: V,
       center: [-98, 39],
       zoom: 3.5,
       ...t.mapOptions
     }), this.map.on("load", () => {
-      console.log("[MapManager] Map loaded. Applying initial theme:", r), M(this.map, this.currentCustomizations), this.emit("style:applied", {
+      console.log("[MapManager] Map loaded. Applying initial theme:", r), z(this.map, this.currentCustomizations), this.emit("style:applied", {
         themeName: this.currentThemeName,
         styles: this.currentCustomizations
       });
@@ -13484,29 +13384,29 @@ class O extends E {
       console.error(`[MapManager] Theme "${e}" does not exist.`);
       return;
     }
-    const t = JSON.parse(JSON.stringify(this.themes[e])), i = this.currentCustomizations.labels;
-    if (i)
-      for (const n in i) {
-        i[n]?.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = i[n].visible);
-        for (const r in i[n])
-          i[n][r]?.hasOwnProperty("visible") && t.labels[n]?.[r] && (t.labels[n][r].visible = i[n][r].visible);
+    const t = JSON.parse(JSON.stringify(this.themes[e])), a = this.currentCustomizations.labels;
+    if (a)
+      for (const n in a) {
+        a[n]?.hasOwnProperty("visible") && t.labels[n] && (t.labels[n].visible = a[n].visible);
+        for (const r in a[n])
+          a[n][r]?.hasOwnProperty("visible") && t.labels[n]?.[r] && (t.labels[n][r].visible = a[n][r].visible);
       }
-    this.currentCustomizations = t, this.currentThemeName = e, M(this.map, this.currentCustomizations), this.emit("style:applied", {
+    this.currentCustomizations = t, this.currentThemeName = e, z(this.map, this.currentCustomizations), this.emit("style:applied", {
       themeName: this.currentThemeName,
       styles: this.currentCustomizations
     });
   }
   setLabelGroupVisibility(e, t) {
-    const i = `labels.${e}.visible`;
+    const a = `labels.${e}.visible`;
     let n = this.currentCustomizations;
-    const r = i.split(".");
+    const r = a.split(".");
     for (let c = 0; c < r.length - 1; c++)
       if (n = n[r[c]], !n) {
         console.error(`Invalid label group key: ${e}`);
         return;
       }
     n[r[r.length - 1]] = t;
-    const o = e.replace(/\.(.)/g, (c, _) => _.toUpperCase()), s = d[o]?.layerId;
+    const o = e.replace(/\.(.)/g, (c, l) => l.toUpperCase()), s = f[o]?.layerId;
     s && this.map.getLayer(s) ? (this.map.setLayoutProperty(s, "visibility", t ? "visible" : "none"), console.log(`[MapManager] Set visibility for ${s} to ${t}`)) : console.warn(`[MapManager] Could not find layer for label group key: ${e} (mapped to ${o})`);
   }
   addWeatherManager(e) {
@@ -13516,457 +13416,7 @@ class O extends E {
     return this.map;
   }
 }
-class j {
-  constructor(e, t = {}) {
-    this.manager = e, this.element = null, this.selectElement = null, this.labelElement = null, this.options = {
-      label: t.label || "Model Run",
-      runFormatter: t.runFormatter || this._defaultFormatRunDisplay
-    };
-  }
-  _defaultFormatRunDisplay(e, t) {
-    const i = e.substring(0, 4), n = e.substring(4, 6), r = e.substring(6, 8);
-    return `${i}-${n}-${r} (${t}Z)`;
-  }
-  _populate() {
-    const e = this.manager.modelStatus, { model: t, date: i, run: n } = this.manager.state;
-    if (!e || !this.selectElement) return;
-    const r = e[t];
-    if (!r) {
-      this.selectElement.innerHTML = "<option>Model offline</option>", this.selectElement.disabled = !0;
-      return;
-    }
-    const o = [];
-    for (const s in r)
-      for (const c in r[s])
-        o.push({ date: s, run: c });
-    o.sort((s, c) => {
-      const _ = c.date.localeCompare(s.date);
-      return _ !== 0 ? _ : c.run.localeCompare(s.run);
-    }), this.selectElement.innerHTML = "", o.forEach(({ date: s, run: c }) => {
-      const _ = document.createElement("option");
-      _.value = `${s}:${c}`, _.textContent = this.options.runFormatter(s, c), this.selectElement.appendChild(_);
-    }), this.selectElement.value = `${i}:${n}`, this.selectElement.disabled = !1;
-  }
-  /**
-   * NEW: Updates the panel's label with the current model name.
-   * @private
-   */
-  _updateLabel() {
-    this.labelElement && (this.labelElement.textContent = `${this.options.label} (${this.manager.state.model.toUpperCase()})`);
-  }
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    if (!t)
-      throw new Error(`AguaceroAPI Error: The target element "${e}" for RunSelectorPanel could not be found.`);
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-run-selector", this.element.innerHTML = `
-            <label class="aguacero-panel-label"></label>
-            <select class="aguacero-panel-select" disabled><option>Loading...</option></select>
-        `, this.labelElement = this.element.querySelector("label"), this.selectElement = this.element.querySelector("select"), this.selectElement.addEventListener("change", (i) => {
-      const [n, r] = i.target.value.split(":");
-      this.manager.setState({ date: n, run: r, forecastHour: 0 });
-    }), this.manager.on("state:change", () => {
-      this._populate(), this._updateLabel();
-    }), t.appendChild(this.element), this._updateLabel(), this;
-  }
-}
-class Q {
-  /**
-   * Creates an instance of ModelSelectorPanel.
-   * @param {FillLayerManager} manager - The main controller instance.
-   * @param {object} [options={}] - Customization options.
-   * @param {string} [options.label] - Custom text for the panel's label.
-   */
-  constructor(e, t = {}) {
-    this.manager = e, this.element = null, this.selectElement = null, this.options = {
-      label: t.label || "Weather Model"
-    };
-  }
-  /**
-   * Populates the select dropdown with available models from the manager's status.
-   * @private
-   */
-  _populate() {
-    const e = this.manager.modelStatus;
-    if (!e || !this.selectElement) return;
-    const t = Object.keys(e).sort(), i = this.manager.state.model;
-    this.selectElement.innerHTML = "", t.forEach((n) => {
-      const r = document.createElement("option");
-      r.value = n, r.textContent = n.toUpperCase(), this.selectElement.appendChild(r);
-    }), this.selectElement.value = i, this.selectElement.disabled = !1;
-  }
-  /**
-   * Renders the panel and appends it to a target DOM element.
-   * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
-   */
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    if (!t)
-      throw new Error(`AguaceroAPI Error: The target element "${e}" for ModelSelectorPanel could not be found.`);
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-model-selector", this.element.innerHTML = `
-            <label class="aguacero-panel-label">${this.options.label}</label>
-            <select class="aguacero-panel-select" disabled><option>Loading...</option></select>
-        `, this.selectElement = this.element.querySelector("select"), this.selectElement.addEventListener("change", (i) => {
-      this.manager.setModel(i.target.value);
-    }), this.manager.on("state:change", () => this._populate()), t.appendChild(this.element), this;
-  }
-}
-class $ {
-  /**
-   * Creates an instance of ForecastSliderPanel.
-   * @param {FillLayerManager} manager - The main controller instance.
-   * @param {object} [options={}] - Customization options.
-   * @param {string} [options.label] - Custom text for the panel's label.
-   * @param {number} [options.playSpeed=500] - The time in milliseconds between steps when playing.
-   */
-  constructor(e, t = {}) {
-    this.manager = e, this.element = null, this.sliderElement = null, this.displayElement = null, this.isPlaying = !1, this.playIntervalId = null, this.buttons = {}, this.pendingUpdate = !1, this.latestForecastHour = null, this.options = {
-      label: t.label || "Forecast Hour",
-      // --- NEW --- API option for playback speed with a default value
-      playSpeed: t.playSpeed || 500
-    }, this._handleKeyDown = this._handleKeyDown.bind(this);
-  }
-  /**
-   * Updates the slider's range and value based on the manager's current state.
-   * @private
-   */
-  _update() {
-    const { model: e, date: t, run: i, forecastHour: n } = this.manager.state, r = this.manager.modelStatus?.[e]?.[t]?.[i];
-    if (!r || r.length === 0) {
-      this.sliderElement.disabled = !0, Object.values(this.buttons).forEach((s) => s.disabled = !0), this.sliderElement.max = 0, this.displayElement.textContent = "N/A";
-      return;
-    }
-    const o = r.indexOf(n);
-    this.sliderElement.max = r.length - 1, this.sliderElement.value = o >= 0 ? o : 0, this.displayElement.textContent = n, this.sliderElement.disabled = !1, Object.values(this.buttons).forEach((s) => s.disabled = !1);
-  }
-  // --- NEW METHOD --- Advances the slider by one step in a given direction
-  _step(e) {
-    if (this.sliderElement.disabled) return;
-    const t = this.manager.modelStatus[this.manager.state.model][this.manager.state.date][this.manager.state.run];
-    if (!t) return;
-    let i = parseInt(this.sliderElement.value, 10);
-    const n = t.length - 1;
-    let r = i + e;
-    r > n ? r = 0 : r < 0 && (r = n);
-    const o = t[r];
-    this.displayElement.textContent = o, this.latestForecastHour = o, this.pendingUpdate || (this.pendingUpdate = !0, requestAnimationFrame(() => this._performUpdate()));
-  }
-  // --- NEW METHOD --- Starts the playback timer
-  _play() {
-    this.isPlaying || (this.isPlaying = !0, this.buttons.playPause.innerHTML = "&#9208;", this.buttons.playPause.title = "Pause (Space)", clearInterval(this.playIntervalId), this.playIntervalId = setInterval(() => {
-      this._step(1);
-    }, this.options.playSpeed));
-  }
-  // --- NEW METHOD --- Stops the playback timer
-  _pause() {
-    this.isPlaying && (this.isPlaying = !1, this.buttons.playPause.innerHTML = "&#9654;", this.buttons.playPause.title = "Play (Space)", clearInterval(this.playIntervalId), this.playIntervalId = null);
-  }
-  // --- NEW METHOD --- Toggles between play and pause
-  _togglePlayPause() {
-    this.isPlaying ? this._pause() : this._play();
-  }
-  // --- NEW METHOD --- Handles global keyboard shortcuts
-  _handleKeyDown(e) {
-    if (!(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA"))
-      switch (e.key) {
-        case ",":
-          this._step(-1);
-          break;
-        case ".":
-          this._step(1);
-          break;
-        case " ":
-          e.preventDefault(), this._togglePlayPause();
-          break;
-      }
-  }
-  /**
-   * The function that performs the expensive state update.
-   * @private
-   */
-  _performUpdate() {
-    this.pendingUpdate && (this.pendingUpdate = !1, this.manager.setState({ forecastHour: this.latestForecastHour }));
-  }
-  /**
-   * Renders the panel and appends it to a target DOM element.
-   * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
-   * @returns {this} The instance for chaining.
-   */
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    if (!t)
-      throw new Error(`AguaceroAPI Error: The target element "${e}" for ForecastSliderPanel could not be found in the DOM.`);
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-slider", this.element.innerHTML = `
-            <label class="aguacero-panel-label">${this.options.label}: +<span class="aguacero-slider-display">0</span>hr</label>
-            <div class="aguacero-slider-wrapper">
-                <div class="aguacero-slider-controls">
-                    <button class="aguacero-button" data-action="step-back" title="Step Back (,)" disabled>&#9664;</button>
-                    <button class="aguacero-button" data-action="play-pause" title="Play (Space)" disabled>&#9654;</button>
-                    <button class="aguacero-button" data-action="step-forward" title="Step Forward (.)" disabled>&#9654;&#9654;</button>
-                </div>
-                <input type="range" class="aguacero-slider-input" min="0" max="0" value="0" step="1" disabled>
-            </div>
-        `, this.sliderElement = this.element.querySelector(".aguacero-slider-input"), this.displayElement = this.element.querySelector(".aguacero-slider-display"), this.buttons.stepBack = this.element.querySelector('[data-action="step-back"]'), this.buttons.playPause = this.element.querySelector('[data-action="play-pause"]'), this.buttons.stepForward = this.element.querySelector('[data-action="step-forward"]'), this.sliderElement.addEventListener("input", (i) => {
-      this._pause();
-      const { model: n, date: r, run: o } = this.manager.state, s = this.manager.modelStatus[n][r][o];
-      if (!s) return;
-      const c = s[parseInt(i.target.value, 10)];
-      this.displayElement.textContent = c, this.latestForecastHour = c, this.pendingUpdate || (this.pendingUpdate = !0, requestAnimationFrame(() => this._performUpdate()));
-    }), this.buttons.stepBack.addEventListener("click", () => this._step(-1)), this.buttons.stepForward.addEventListener("click", () => this._step(1)), this.buttons.playPause.addEventListener("click", () => this._togglePlayPause()), document.addEventListener("keydown", this._handleKeyDown), this.manager.on("state:change", () => this._update()), t.appendChild(this.element), this;
-  }
-  // --- NEW (Optional but Recommended) --- Add a remove method for cleanup
-  /**
-   * Removes the panel and cleans up global event listeners.
-   */
-  remove() {
-    this._pause(), document.removeEventListener("keydown", this._handleKeyDown), this.element && this.element.parentNode && this.element.parentNode.removeChild(this.element);
-  }
-}
-class q {
-  constructor(e) {
-    this.manager = e, this.element = null;
-  }
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-theme-control", this.element.innerHTML = `
-            <div class="aguacero-panel-label">Map Theme</div>
-            <div class="aguacero-button-group">
-                <button data-theme="light" class="aguacero-button">Light</button>
-                <button data-theme="dark" class="aguacero-button">Dark</button>
-            </div>
-        `, this.buttons = this.element.querySelectorAll("button"), this.buttons.forEach((i) => {
-      i.addEventListener("click", (n) => {
-        this.manager.setTheme(n.target.dataset.theme);
-      });
-    }), this.manager.on("style:applied", ({ themeName: i }) => {
-      this.buttons.forEach((n) => {
-        n.classList.toggle("active", n.dataset.theme === i);
-      });
-    }), t.appendChild(this.element), this;
-  }
-}
-class X {
-  constructor(e, t = {}) {
-    this.manager = e, this.labels = t.labels || [], this.element = null;
-  }
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-label-control", this.element.innerHTML = '<div class="aguacero-panel-label">Labels</div>', this.labels.forEach((i) => {
-      const n = document.createElement("div");
-      n.className = "aguacero-toggle-row";
-      const r = `label-toggle-${i.key.replace(".", "-")}`;
-      n.innerHTML = `
-                <label for="${r}">${i.label}</label>
-                <input type="checkbox" id="${r}" data-key="${i.key}">
-            `, n.querySelector("input").addEventListener("change", (s) => {
-        this.manager.setLabelGroupVisibility(s.target.dataset.key, s.target.checked);
-      }), this.element.appendChild(n);
-    }), this.manager.on("style:applied", ({ styles: i }) => {
-      this.element.querySelectorAll('input[type="checkbox"]').forEach((n) => {
-        const [r, o] = n.dataset.key.split("."), s = i.labels?.[r]?.[o]?.visible;
-        s !== void 0 && (n.checked = s);
-      });
-    }), this.buttons.forEach((i) => {
-      i.addEventListener("click", (n) => {
-        const r = n.target.dataset.theme;
-        this.manager.setTheme(r);
-      });
-    }), t.appendChild(this.element), this;
-  }
-}
-class Z {
-  /**
-   * Creates an instance of UnitControlPanel.
-   * @param {FillLayerManager} manager - The main controller instance.
-   */
-  constructor(e) {
-    this.manager = e, this.element = null, this.buttons = null;
-  }
-  /**
-   * A helper method to update the active state of the buttons.
-   * @param {string} activeUnit - The unit system that should be marked as active.
-   * @private
-   */
-  _updateButtons(e) {
-    this.buttons && this.buttons.forEach((t) => {
-      t.classList.toggle("active", t.dataset.unit === e);
-    });
-  }
-  /**
-   * Renders the panel and appends it to a target DOM element.
-   * @param {string|HTMLElement} target - A CSS selector string or a DOM element.
-   * @returns {this} The instance for chaining.
-   */
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    if (!t)
-      throw new Error(`AguaceroAPI Error: The target element "${e}" for UnitControlPanel could not be found.`);
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-unit-control", this.element.innerHTML = `
-            <div class="aguacero-panel-label">Units</div>
-            <div class="aguacero-button-group">
-                <button data-unit="imperial" class="aguacero-button">Imperial</button>
-                <button data-unit="metric" class="aguacero-button">Metric</button>
-            </div>
-        `, this.buttons = this.element.querySelectorAll("button"), this.buttons.forEach((i) => {
-      i.addEventListener("click", (n) => {
-        const r = n.target.dataset.unit;
-        this.manager.setUnits(r);
-      });
-    }), this.manager.on("state:change", ({ units: i }) => {
-      this._updateButtons(i);
-    }), t.appendChild(this.element), this._updateButtons(this.manager.state.units), this;
-  }
-}
-class J {
-  constructor(e, t = {}) {
-    this.manager = e, this.options = {
-      position: t.position || "bottom-right",
-      labelFormatter: t.labelFormatter || ((i) => Math.round(i))
-    }, this._container = document.createElement("div"), this._container.className = "mapboxgl-ctrl aguacero-legend-panel";
-  }
-  /**
-   * Required by Mapbox's IControl interface.
-   * This method is called when the control is added to the map.
-   * @param {mapboxgl.Map} map - The Mapbox map instance.
-   * @returns {HTMLElement} The control's container element.
-   */
-  onAdd(e) {
-    return this.map = e, this.manager.on("state:change", (t) => this._update(t)), this._update(this.manager.state), this._container;
-  }
-  /**
-   * Required by Mapbox's IControl interface.
-   * This method is called when the control is removed from the map.
-   */
-  onRemove() {
-    this._container && this._container.parentNode && this._container.parentNode.removeChild(this._container), this.map = void 0;
-  }
-  _update(e) {
-    if (!this._container) return;
-    const { colormap: t, colormapBaseUnit: i } = this.manager.baseLayerOptions;
-    if (!t || t.length < 2) {
-      this._container.style.display = "none";
-      return;
-    }
-    this._container.style.display = "block";
-    const r = (R.fld[e.variable] || {}).variable || "Legend", o = this._getUnitLabel(i, e.units), s = this._generateStopsHtml(t, i, e.units);
-    this._container.innerHTML = `
-            <h3 class="aguacero-legend-title">${r} (${o})</h3>
-            <div class="aguacero-legend-body">${s}</div>
-        `;
-  }
-  // _generateStopsHtml, _getUnitLabel, and _getTargetUnitForLegend methods
-  // remain exactly the same as the previous correct versions.
-  _generateStopsHtml(e, t, i) {
-    const n = [];
-    for (let f = 0; f < e.length; f += 2)
-      n.push({ value: e[f], color: e[f + 1] });
-    if (n.length < 2) return "";
-    const r = n[0].value, o = n[n.length - 1].value, s = this._getTargetUnitForLegend(t, i), c = z(t, s), _ = this.options.labelFormatter(c ? c(r) : r), m = this.options.labelFormatter(c ? c(o) : o);
-    return `
-            <div class="aguacero-legend-gradient" style="background: ${`linear-gradient(to right, ${n.map((f) => `${f.color}`).join(", ")})`};"></div>
-            <div class="aguacero-legend-labels">
-                <span class="aguacero-legend-label-min">${_}</span>
-                <span class="aguacero-legend-label-max">${m}</span>
-            </div>
-        `;
-  }
-  _getUnitLabel(e, t) {
-    const i = (e || "").toLowerCase();
-    if (i === "dbz") return "dBZ";
-    if (t === "metric") {
-      if (i.includes("f") || i.includes("c")) return "°C";
-      if (["kts", "mph", "m/s"].includes(i)) return "km/h";
-      if (["in", "mm", "cm"].includes(i)) return "mm";
-    }
-    return i.includes("f") || i.includes("c") ? "°F" : ["kts", "mph", "m/s"].includes(i) ? "mph" : ["in", "mm", "cm"].includes(i) ? "in" : i;
-  }
-  _getTargetUnitForLegend(e, t) {
-    const i = (e || "").toLowerCase();
-    if (t === "metric") {
-      if (i.includes("f") || i.includes("c")) return "celsius";
-      if (["kts", "mph", "m/s"].includes(i)) return "km/h";
-      if (["in", "mm", "cm"].includes(i)) return "mm";
-    }
-    return i.includes("f") || i.includes("c") ? "fahrenheit" : ["kts", "mph", "m/s"].includes(i) ? "mph" : ["in", "mm", "cm"].includes(i) ? "in" : i;
-  }
-}
-class K {
-  constructor(e, t = {}) {
-    this.manager = e, this.element = null, this.options = {
-      title: t.title || "Layers"
-    };
-  }
-  /**
-   * Builds a structured object of available variables for the current model.
-   * @returns {object} A nested object: { category: { subCategory: [variableInfo, ...] } }
-   * @private
-   */
-  _getAvailableVariables() {
-    const e = this.manager.state.model, t = H[e];
-    if (!t) return {};
-    const i = {};
-    return t.vars.forEach((n) => {
-      const r = R.fld[n];
-      if (!r) return;
-      const { category: o, subCategory: s, variable: c } = r;
-      i[o] || (i[o] = {}), i[o][s] || (i[o][s] = []), i[o][s].push({ id: n, name: c });
-    }), i;
-  }
-  /**
-   * Renders the panel's content based on available variables.
-   * @private
-   */
-  _populate() {
-    if (!this.element) return;
-    const e = this._getAvailableVariables();
-    let t = "";
-    for (const i in e) {
-      t += `<div class="aguacero-layer-category">
-                <div class="aguacero-layer-header">${i}</div>
-                <div class="aguacero-layer-content">`;
-      for (const n in e[i])
-        t += `<div class="aguacero-layer-subcategory">
-                    <div class="aguacero-layer-subheader">${n}</div>
-                    <div class="aguacero-layer-items">`, e[i][n].forEach((r) => {
-          const o = r.id === this.manager.state.variable ? "active" : "";
-          t += `<div class="aguacero-layer-item ${o}" data-variable-id="${r.id}">${r.name}</div>`;
-        }), t += "</div></div>";
-      t += "</div></div>";
-    }
-    this.element.querySelector(".aguacero-panel-body").innerHTML = t, this._addEventListeners();
-  }
-  /**
-   * Adds click handlers for the accordion and item selection.
-   * @private
-   */
-  _addEventListeners() {
-    this.element.querySelectorAll(".aguacero-layer-header, .aguacero-layer-subheader").forEach((e) => {
-      e.addEventListener("click", () => {
-        e.parentElement.classList.toggle("open");
-      });
-    }), this.element.querySelectorAll(".aguacero-layer-item").forEach((e) => {
-      e.addEventListener("click", (t) => {
-        const i = t.target.dataset.variableId;
-        this.manager.setVariable(i);
-      });
-    });
-  }
-  addTo(e) {
-    const t = typeof e == "string" ? document.querySelector(e) : e;
-    return this.element = document.createElement("div"), this.element.className = "aguacero-panel aguacero-layer-control", this.element.innerHTML = `
-            <div class="aguacero-panel-header">${this.options.title}</div>
-            <div class="aguacero-panel-body"></div>
-        `, t.appendChild(this.element), this.manager.on("state:change", () => this._populate()), this._populate(), this;
-  }
-}
 export {
-  G as FillLayerManager,
-  $ as ForecastSliderPanel,
-  X as LabelControlPanel,
-  K as LayerControlPanel,
-  J as LegendPanel,
-  O as MapManager,
-  Q as ModelSelectorPanel,
-  j as RunSelectorPanel,
-  q as ThemeControlPanel,
-  Z as UnitControlPanel
+  B as FillLayerManager,
+  N as MapManager
 };

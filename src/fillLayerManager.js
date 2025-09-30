@@ -4,10 +4,12 @@ import { EventEmitter } from './events.js';
 import { GridRenderLayer } from './GridRenderLayer.js';
 import { COORDINATE_CONFIGS } from './coordinate_configs.js';
 import { getUnitConversionFunction } from './unitConversions.js';
-// NEW IMPORTS
 import { DICTIONARIES } from './model-definitions.js';
 import { DEFAULT_COLORMAPS } from './default-colormaps.js';
-import { injectStyles } from './styles.js'; 
+// At the top of FillLayerManager.js, add this import
+import { MODEL_CONFIGS } from './model-definitions.js';
+
+// Then add this method to the FillLayerManager class:
 
 function findLatestModelRun(modelsData, modelName) {
     const model = modelsData?.[modelName];
@@ -27,16 +29,9 @@ export class FillLayerManager extends EventEmitter {
         super();
         if (!map) throw new Error('A Mapbox GL map instance is required.');
 
-        injectStyles();
-
         this.map = map;
         this.layers = new Map();
-        
-        // --- THIS IS THE FIX ---
-        // Re-introduce the missing layerId initialization.
         this.layerId = options.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
-        // ------------------------
-
         this.baseUrl = 'https://d3dc62msmxkrd7.cloudfront.net/grids';
         this.worker = this.createWorker();
         this.workerRequestId = 0;
@@ -47,11 +42,15 @@ export class FillLayerManager extends EventEmitter {
         this.loadStrategy = options.loadStrategy || 'on-demand';
         this.dataCache = new Map();
         
-        // --- The rest of the constructor logic is correct ---
+        // --- Playback State ---
+        this.isPlaying = false;
+        this.playIntervalId = null;
+        this.playbackSpeed = options.playbackSpeed || 500;
+
+        // --- Data & Style Configuration ---
         this.customColormaps = options.customColormaps || {};
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || '2t_2';
-
         const { colormap, baseUnit } = this._getColormapForVariable(initialVariable);
 
         this.baseLayerOptions = {
@@ -77,31 +76,213 @@ export class FillLayerManager extends EventEmitter {
         this.autoRefreshIntervalId = null;
     }
 
-    // --- START OF FIX ---
     /**
-     * NEW METHOD: A central router for all messages coming from the web worker.
-     * It uses the requestId to resolve the correct promise.
-     * @private
+     * Gets the available variables for a specific model
+     * @param {string} modelName - The model to get variables for
+     * @returns {Array<string>} Array of variable codes
      */
+    getAvailableVariables(modelName = null) {
+        const model = modelName || this.state.model;
+        return MODEL_CONFIGS[model]?.vars || [];
+    }
+
+    /**
+     * Gets a human-readable name for a variable
+     * @param {string} variableCode - The variable code (e.g., '2t_2')
+     * @returns {string} Human-readable name
+     */
+    getVariableDisplayName(variableCode) {
+        const varInfo = DICTIONARIES.fld[variableCode];
+        return varInfo?.displayName || varInfo?.name || variableCode;
+    }
+
     _handleWorkerMessage(e) {
         const { success, requestId, decompressedData, encoding, error } = e.data;
-
-        // Check if there's a promise waiting for this ID.
         if (this.workerResolvers.has(requestId)) {
             const { resolve, reject } = this.workerResolvers.get(requestId);
-            
             if (success) {
-                // IMPORTANT: The worker returns the decompressed data and the original encoding object.
                 const result = { data: decompressedData, encoding: encoding };
                 resolve(result);
             } else {
                 reject(new Error(error));
             }
-            
-            // Clean up the resolver map.
             this.workerResolvers.delete(requestId);
-        } 
+        }
     }
+
+    // ========================================================================
+    // --- PUBLIC API METHODS ---
+    // ========================================================================
+
+    play() {
+        if (this.isPlaying) return;
+        this.isPlaying = true;
+        clearInterval(this.playIntervalId);
+        this.playIntervalId = setInterval(() => { this.step(1); }, this.playbackSpeed);
+        this.emit('playback:start', { speed: this.playbackSpeed });
+    }
+
+    pause() {
+        if (!this.isPlaying) return;
+        this.isPlaying = false;
+        clearInterval(this.playIntervalId);
+        this.playIntervalId = null;
+        this.emit('playback:stop');
+    }
+
+    togglePlay() {
+        if (this.isPlaying) this.pause();
+        else this.play();
+    }
+
+    step(direction = 1) {
+        const { model, date, run, forecastHour } = this.state;
+        const forecastHours = this.modelStatus?.[model]?.[date]?.[run];
+        if (!forecastHours || forecastHours.length === 0) return;
+        const currentIndex = forecastHours.indexOf(forecastHour);
+        if (currentIndex === -1) return;
+        const maxIndex = forecastHours.length - 1;
+        let nextIndex = currentIndex + direction;
+        if (nextIndex > maxIndex) nextIndex = 0;
+        if (nextIndex < 0) nextIndex = maxIndex;
+        this.setState({ forecastHour: forecastHours[nextIndex] });
+    }
+    
+    setPlaybackSpeed(speed) {
+        if (speed > 0) {
+            this.playbackSpeed = speed;
+            if (this.isPlaying) this.play();
+        }
+    }
+
+    async setState(newState) {
+        const modelChanged = newState.model && newState.model !== this.state.model;
+        const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
+        const variableChanged = newState.variable && newState.variable !== this.state.variable;
+
+        // Apply new state changes to the internal state object
+        Object.assign(this.state, newState);
+
+        if (modelChanged || runChanged || variableChanged) {
+            // Fade out the old layer while new data loads
+            if (this.layers.has(this.layerId)) {
+                this.layers.get(this.layerId).shaderLayer.updateStyle({ opacity: 0 });
+                this.map.triggerRepaint();
+            }
+            this.dataCache.clear();
+        }
+
+        // --- START OF LEGEND FIX ---
+        // After every state change, recalculate the colormap for the UI based on current units.
+        const baseColormap = this.baseLayerOptions.colormap;
+        const fromUnit = this.baseLayerOptions.colormapBaseUnit;
+        const toUnit = this._getTargetUnit(fromUnit, this.state.units);
+        
+        // This is the colormap the legend should display, with correctly converted values.
+        const displayColormap = this._convertColormapUnits(baseColormap, fromUnit, toUnit);
+        // --- END OF LEGEND FIX ---
+
+        // Emit the 'state:change' event with all data the UI needs, including the corrected colormap.
+        const { model, date, run } = this.state;
+        this.emit('state:change', {
+            ...this.state,
+            availableModels: this.modelStatus ? Object.keys(this.modelStatus).sort() : [],
+            availableRuns: this.modelStatus?.[model] || {},
+            availableHours: this.modelStatus?.[model]?.[date]?.[run] || [],
+            availableVariables: this.getAvailableVariables(),
+            isPlaying: this.isPlaying,
+            colormap: displayColormap, // Use the converted colormap
+            colormapBaseUnit: toUnit, // And its corresponding unit name
+        });
+
+        // Now, load the grid data in the background. The UI is already responsive.
+        this._loadAndRenderGrid(this.state);
+        
+        if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload') {
+            setTimeout(() => this._preloadCurrentRun(), 0);
+        }
+    }
+
+    /**
+     * A helper method to consolidate loading and rendering logic.
+     * @private
+     */
+    async _loadAndRenderGrid(state) {
+        const grid = await this._loadGridData(state);
+        if (grid && grid.data) {
+            const fullOptions = { ...this.baseLayerOptions, ...state };
+            this._updateOrCreateLayer(this.layerId, fullOptions, grid.data, grid.encoding);
+        } else {
+            this.removeLayer(this.layerId);
+        }
+    }
+        
+    /**
+     * Sets the active weather variable for the layer.
+     * @param {string} newVariable - The name of the variable to display (e.g., 'refc_0').
+     */
+    async setVariable(newVariable) {
+        if (newVariable === this.state.variable) return;
+
+        // 1. Get the new base colormap and unit for the selected variable.
+        const { colormap, baseUnit } = this._getColormapForVariable(newVariable);
+        
+        // 2. Update the base options that will be used for all subsequent calculations.
+        this.baseLayerOptions.variable = newVariable;
+        this.baseLayerOptions.colormap = colormap;
+        this.baseLayerOptions.colormapBaseUnit = baseUnit;
+        
+        // 3. Trigger the main state update. The updated `setState` will use these
+        //    new base options to calculate the display colormap and emit it.
+        await this.setState({ variable: newVariable, forecastHour: 0 });
+    }
+    
+    async setModel(modelName) {
+        if (modelName === this.state.model) return;
+        if (!this.modelStatus || !this.modelStatus[modelName]) return;
+        const latestRun = findLatestModelRun(this.modelStatus, modelName);
+        if (latestRun) {
+            await this.setState({ model: modelName, date: latestRun.date, run: latestRun.run, forecastHour: 0 });
+        }
+    }
+    
+    async setRun(runString) { // e.g., "20250929:12"
+        const [date, run] = runString.split(':');
+        if (date !== this.state.date || run !== this.state.run) {
+            await this.setState({ date, run, forecastHour: 0 });
+        }
+    }
+
+    async setUnits(newUnits) {
+        if (newUnits === this.state.units || !['metric', 'imperial'].includes(newUnits)) return;
+        await this.setState({ units: newUnits });
+    }
+
+    async initialize(options = {}) {
+        await this.fetchModelStatus(true);
+        
+        const latestRun = findLatestModelRun(this.modelStatus, this.state.model);
+        
+        let initialState = this.state;
+        if (latestRun) {
+            initialState = { ...this.state, ...latestRun, forecastHour: 0 };
+        }
+        
+        // This single call to setState will handle everything:
+        // 1. It will update the internal state.
+        // 2. It will calculate the correct display colormap.
+        // 3. It will emit the complete state to the UI.
+        // 4. It will load the map data in the background.
+        await this.setState(initialState);
+        
+        if (options.autoRefresh ?? this.autoRefreshEnabled) {
+            this.startAutoRefresh(options.refreshInterval ?? this.autoRefreshIntervalSeconds);
+        }
+    }
+
+    // ========================================================================
+    // --- PRIVATE HELPER METHODS ---
+    // ========================================================================
 
     _getColormapForVariable(variableName) {
         const customMap = this.customColormaps[variableName];
@@ -223,59 +404,6 @@ export class FillLayerManager extends EventEmitter {
         if (['kts', 'mph', 'm/s'].includes(defaultUnit)) return 'mph';
         if (['in', 'mm', 'cm'].includes(defaultUnit)) return 'in';
         return defaultUnit; // Fallback
-    }
-
-    // ========================================================================
-    // --- THIS ENTIRE FUNCTION WAS MISSING IN THE PREVIOUS RESPONSE ---
-    // ========================================================================
-    /**
-     * Sets the active weather variable for the layer.
-     * @param {string} newVariable - The name of the variable to display (e.g., 'refc_0').
-     */
-    async setVariable(newVariable) {
-        if (newVariable === this.state.variable) return;
-
-        // Use the centralized lookup function to get the correct colormap
-        const { colormap, baseUnit } = this._getColormapForVariable(newVariable);
-        
-        // Update the base options that will be used for rendering this variable
-        this.baseLayerOptions.variable = newVariable;
-        this.baseLayerOptions.colormap = colormap;
-        this.baseLayerOptions.colormapBaseUnit = baseUnit;
-        
-        // Trigger the state update, which will now use the new base options
-        await this.setState({ variable: newVariable });
-    }
-
-    async setState(newState) {
-        const modelChanged = newState.model && newState.model !== this.state.model;
-        const runChanged = newState.date && newState.run && (newState.date !== this.state.date || newState.run !== this.state.run);
-        const variableChanged = newState.variable && newState.variable !== this.state.variable;
-
-        if (modelChanged || runChanged || variableChanged) {
-            this.dataCache.clear();
-        }
-        // --- END OF FIX ---
-
-        Object.assign(this.state, newState);
-
-        const grid = await this._loadGridData(this.state);
-        
-        if (grid && grid.data) {
-            const fullOptions = { ...this.baseLayerOptions, ...this.state };
-            this._updateOrCreateLayer(this.layerId, fullOptions, grid.data, grid.encoding);
-        } else {
-            this.removeLayer(this.layerId);
-        }
-        
-        this.emit('state:change', this.state);
-        
-        // --- START OF FIX ---
-        // 3. Trigger the preload if the context has changed and the strategy is 'preload'.
-        if ((modelChanged || runChanged || variableChanged) && this.loadStrategy === 'preload') {
-            setTimeout(() => this._preloadCurrentRun(), 0);
-        }
-        // --- END OF FIX ---
     }
 
     async setModel(modelName) {
@@ -422,7 +550,7 @@ export class FillLayerManager extends EventEmitter {
         }
     }
     async _loadGridData(state) {
-        const { model, date, run, forecastHour, variable, smoothing } = { ...this.baseLayerOptions, ...state };
+        const { model, date, run, forecastHour, variable, smoothing = 0 } = { ...this.baseLayerOptions, ...state };
         const dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
 
         if (this.dataCache.has(dataUrlIdentifier)) {
@@ -470,10 +598,20 @@ export class FillLayerManager extends EventEmitter {
     async setUnits(newUnits) {
         if (newUnits === this.state.units || !['metric', 'imperial'].includes(newUnits)) { return; } await this.setState({ units: newUnits });
     }
-    async initialize(options = {}) {
-        const modelStatus = await this.fetchModelStatus(); const latestRun = findLatestModelRun(modelStatus, this.state.model); if (latestRun) { await this.setState({ ...latestRun, forecastHour: 0 }); } else { console.error(`Could not initialize. No runs found for model "${this.state.model}".`); this.emit('state:change', this.state); } const startRefresh = options.autoRefresh ?? this.autoRefreshEnabled; if (startRefresh) { const interval = options.refreshInterval ?? this.autoRefreshIntervalSeconds; this.startAutoRefresh(interval); }
-    }
     removeLayer(id) {
         if (this.layers.has(id)) { if (this.map.getLayer(id)) this.map.removeLayer(id); this.layers.delete(id); }
+    }
+    /**
+     * Cleans up all resources used by the manager.
+     * Removes the layer from the map, stops timers, and clears caches.
+     */
+    destroy() {
+        this.pause(); // Stop any playback intervals
+        this.stopAutoRefresh(); // Stop any refresh intervals
+        this.removeLayer(this.layerId); // Remove the layer from the map
+        this.dataCache.clear();
+        this.worker.terminate(); // Terminate the web worker
+        this.callbacks = {}; // Clear all event listeners
+        console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
     }
 }
