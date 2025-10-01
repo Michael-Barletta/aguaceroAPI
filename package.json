@@ -1,32 +1,37 @@
 {
-  "name": "aguacero-api",
-  "version": "1.0.0",
-  "description": "A custom Mapbox GL fill layer manager.",
+  "name": "@aguacerowx/aguacero-api",
+  "version": "0.0.1",
+  "description": "A high-performance weather data visualization API for Mapbox GL JS.",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
   "type": "module",
-  "main": "./dist/aguacero-api.umd.cjs",
-  "module": "./dist/aguacero-api.js",
-  "exports": {
-    ".": {
-      "import": "./dist/aguacero-api.js",
-      "require": "./dist/aguacero-api.umd.cjs"
-    }
-  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build"
-  },
-  "dependencies": {
-    "fzstd": "^0.1.1"
-  },
-  "devDependencies": {
-    "vite": "^5.0.0",
-    "mapbox-gl": "^3.0.0" 
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "proj4": "^2.9.0",
-    "mapbox-gl": "^3.0.0"
+    "mapbox-gl": "^2.0.0 || ^3.0.0",
+    "proj4": "^2.8.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "rollup": "^4.9.6"
+  },
+  "author": "Michael Barletta",
+  "license": "MIT",
+  "keywords": [
+    "weather",
+    "mapbox",
+    "gis",
+    "meteorology",
+    "maps",
+    "aguacero"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-github-username/aguacero-api.git"
   }
 }

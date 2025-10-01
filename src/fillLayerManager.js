@@ -38,18 +38,19 @@ function findLatestModelRun(modelsData, modelName) {
     return null;
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 export class FillLayerManager extends EventEmitter {
     constructor(map, options = {}) {
         super();
         if (!map) throw new Error('A Mapbox GL map instance is required.');
 
         this.map = map;
-        // NEW: This will hold a map of time (hour/timestamp) to its corresponding GridRenderLayer
         this.timeLayers = new Map();
-        this.activeTimeKey = null; // NEW: Tracks the currently visible time key
+        this.activeTimeKey = null; 
 
         this.layerId = options.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
-        this.baseUrl = 'https://d3dc62msmxkrd7.cloudfront.net/grids';
+        this.apiKey = options.apiKey;
+        this.gatekeeperApiUrl = 'https://jz6j3fl7dh.execute-api.us-east-2.amazonaws.com/default';
         this.worker = this.createWorker();
         this.workerRequestId = 0;
         this.workerResolvers = new Map();
@@ -82,14 +83,14 @@ export class FillLayerManager extends EventEmitter {
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
         this.autoRefreshIntervalId = null;
+
+        // --- NEW FOR OPTION 2 ---
+        // Defines how many forecast hours to download in a single batch.
+        this.PRELOAD_BATCH_SIZE = 5; 
     }
 
     // --- Core Logic Overhaul ---
 
-    /**
-     * This is the FAST PATH. It's called when the time slider moves.
-     * It retrieves data (hopefully from the cache) and updates the GPU texture.
-     */
     async _updateLayerData(state) {
         if (!this.shaderLayer || !state.variable) return;
 
@@ -99,9 +100,6 @@ export class FillLayerManager extends EventEmitter {
             const gridModel = state.isMRMS ? 'mrms' : state.model;
             const gridDef = this._getGridCornersAndDef(gridModel).gridDef;
             
-            // --- THE FIX ---
-            // Pass the new option to the texture update function.
-            // If state.isMRMS is true, it will use NEAREST filtering. Otherwise, it will use LINEAR.
             this.shaderLayer.updateDataTexture(
                 grid.data, 
                 grid.encoding, 
@@ -113,10 +111,6 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-    /**
-     * Updates the visual style (colormap, opacity, units) of the single layer
-     * without reloading the underlying grid data.
-     */
     _updateLayerStyle(state) {
         if (!this.shaderLayer || !state.variable) return;
 
@@ -128,34 +122,19 @@ export class FillLayerManager extends EventEmitter {
         const { colormap, baseUnit } = this._getColormapForVariable(state.variable);
         const toUnit = this._getTargetUnit(baseUnit, state.units);
         
-        // This is correct and still needed for the colormap texture gradient and the UI legend
         const finalColormap = this._convertColormapUnits(colormap, baseUnit, toUnit);
-
-        // --- THIS IS THE FIX ---
-        // Instead of using the converted `finalColormap` for the dataRange,
-        // ALWAYS use the original, unconverted `colormap`. The shader will handle the conversion.
         const dataRange = [colormap[0], colormap[colormap.length - 2]];
         
         const dataNativeUnit = (DICTIONARIES.fld[state.variable] || {}).defaultUnit || 'none';
 
         this.shaderLayer.updateGeometry(corners, gridDef);
-        
-        // The texture still needs the correctly converted color gradient
         this.shaderLayer.updateColormapTexture(finalColormap);
-        
-        // The style update now sends the ORIGINAL, UNCONVERTED data range to the shader
         this.shaderLayer.updateStyle({ opacity: state.opacity, dataRange });
-        
-        // This tells the shader how to convert the raw data value before comparing it to the original dataRange
         this.shaderLayer.setUnitConversion(dataNativeUnit, state.units);
         
         this.map.triggerRepaint();
     }
 
-    /**
-     * Main state update function. It now delegates to either re-initializing all layers
-     * for a new variable or simply switching the active layer's visibility.
-     */
     async setState(newState) {
         const previousState = { ...this.state };
         Object.assign(this.state, newState);
@@ -170,78 +149,65 @@ export class FillLayerManager extends EventEmitter {
         const onlyTimeChanged = !needsFullRebuild && ('forecastHour' in newState || 'mrmsTimestamp' in newState);
 
         if (needsFullRebuild) {
-            // A core parameter changed, so we rebuild the layer and start preloading all its data.
             await this._rebuildLayerAndPreload(this.state);
         } else if (onlyTimeChanged) {
-            // Only the time slider moved. This should be instant.
             await this._updateLayerData(this.state);
         } else if (unitsChanged) {
-            // If only units change, we can just update the shader uniforms without reloading data.
             this._updateLayerStyle(this.state);
         }
 
         this._emitStateChange();
     }
 
-    /**
-     * The main path for handling a new variable or model run.
-     * It destroys the old layer, creates a new one, and kicks off preloading for all time steps.
-     */
     async _rebuildLayerAndPreload(state) {
-        // 1. Clean up the old layer and cache
+        // 1. Clean up old layers and cache
         if (this.shaderLayer) {
             this.map.removeLayer(this.shaderLayer.id);
             this.shaderLayer = null;
         }
         this.dataCache.clear();
-
         if (!state.variable) return;
 
-        // 2. Create and add the new single layer instance
+        // 2. Set up the new layer's visual style
         this.shaderLayer = new GridRenderLayer(this.layerId);
         this.map.addLayer(this.shaderLayer, 'AML_-_terrain');
-
-        // 3. Update the layer's geometry and style (this is fast)
         this._updateLayerStyle(state);
 
-        // --- THE FIX ---
-        // 4. Start loading the initial frame BUT DO NOT BLOCK (await is removed).
-        //    This allows the code to immediately continue to the next step.
+        // 3. CRITICAL: Initiate the load for the visible frame.
+        // The 'await' is REMOVED. This is now fire-and-forget.
         this._updateLayerData(state); 
-
-        // 5. Immediately start preloading all other time steps in the background.
-        this._preloadAllTimeSteps(state);
+        
+        // 4. CRITICAL: Immediately initiate the preload for all other frames.
+        // This is also fire-and-forget and will run at the same time as the call above.
+        this._preloadAllTimeSteps(state); 
     }
-
-    /**
-     * Preloads all available time steps for the current state's variable, run, etc.
-     * It runs in the background and populates the cache.
-     */
+    
     _preloadAllTimeSteps(state) {
         const timeSteps = state.isMRMS
             ? (this.mrmsStatus?.[state.variable] || [])
             : (this.modelStatus?.[state.model]?.[state.date]?.[state.run] || []);
 
-        if (!timeSteps || timeSteps.length === 0) return;
+        if (!timeSteps || timeSteps.length <= 1) {
+            return; // Nothing to preload
+        }
 
-        console.log(`[FillLayerManager] Preloading ${timeSteps.length} frames for ${state.variable}...`);
-        
-        // Asynchronously call _loadGridData for each time step.
-        // This will fetch the data and store the resolved promise in the cache.
-        timeSteps.forEach(time => {
+        // Get all time steps EXCEPT the one for the visible frame (which was started above)
+        const currentFrameTime = state.isMRMS ? state.mrmsTimestamp : state.forecastHour;
+        const stepsToPreload = timeSteps.filter(time => time !== currentFrameTime);
+
+        // Use a simple forEach loop to fire all requests immediately and concurrently.
+        stepsToPreload.forEach(time => {
             const stateForTime = { ...state, [state.isMRMS ? 'mrmsTimestamp' : 'forecastHour']: time };
-            this._loadGridData(stateForTime).catch(e => {
-                console.warn(`Failed to preload frame for time ${time}`, e);
-            });
+            
+            // This call just populates the cache.
+            this._loadGridData(stateForTime)
+                .catch(e => console.warn(`Failed to preload frame for time ${time}`, e));
         });
     }
 
-    /**
-     * NEW: Clears old layers and creates a new set of layers for each time step 
-     * of the selected variable. It kicks off data loading for all of them.
-     */
+    // --- NO OTHER CHANGES BELOW THIS LINE ---
+
     async _initializeLayersForVariable(state) {
-        // 1. Clean up any previously existing layers
         this.timeLayers.forEach(shaderLayer => {
             if (this.map.getLayer(shaderLayer.id)) {
                 this.map.removeLayer(shaderLayer.id);
@@ -255,14 +221,12 @@ export class FillLayerManager extends EventEmitter {
             return;
         }
 
-        // 2. Determine which time steps are available
         const timeSteps = state.isMRMS
             ? (this.mrmsStatus?.[state.variable] || [])
             : (this.modelStatus?.[state.model]?.[state.date]?.[state.run] || []);
 
         if (timeSteps.length === 0) return;
 
-        // 3. For each time step, create a layer and start loading its data
         const gridModel = state.isMRMS ? 'mrms' : state.model;
         const geometry = this._getGridCornersAndDef(gridModel);
         if (!geometry) return;
@@ -281,17 +245,15 @@ export class FillLayerManager extends EventEmitter {
             this.map.addLayer(shaderLayer, 'AML_-_terrain');
             this.timeLayers.set(time, shaderLayer);
 
-            // Configure the layer's geometry and appearance ahead of time
             shaderLayer.updateGeometry(corners, gridDef);
             shaderLayer.updateColormapTexture(finalColormap);
-            shaderLayer.updateStyle({ opacity: 0, dataRange }); // Start fully transparent
+            shaderLayer.updateStyle({ opacity: 0, dataRange });
             shaderLayer.setUnitConversion(dataNativeUnit, state.units);
 
             const stateForTime = { ...state, [state.isMRMS ? 'mrmsTimestamp' : 'forecastHour']: time };
             
-            // Asynchronously load data and update the texture when it arrives
             this._loadGridData(stateForTime).then(grid => {
-                if (grid && grid.data && this.timeLayers.has(time)) { // Check if layer still exists
+                if (grid && grid.data && this.timeLayers.has(time)) {
                     shaderLayer.updateDataTexture(
                         grid.data, 
                         grid.encoding, 
@@ -304,22 +266,16 @@ export class FillLayerManager extends EventEmitter {
             });
         });
 
-        // 4. Make the initial time step visible
         this._setActiveTimeLayer(state);
     }
 
-    /**
-     * NEW: Manages visibility. Hides the old layer, shows the new one.
-     */
     _setActiveTimeLayer(state) {
         const timeKey = state.isMRMS ? state.mrmsTimestamp : state.forecastHour;
 
-        // Hide the previously active layer
         if (this.activeTimeKey !== null && this.timeLayers.has(this.activeTimeKey)) {
             this.timeLayers.get(this.activeTimeKey).updateStyle({ opacity: 0 });
         }
         
-        // Show the new active layer
         if (this.timeLayers.has(timeKey)) {
             const newActiveLayer = this.timeLayers.get(timeKey);
             newActiveLayer.updateStyle({ opacity: this.state.opacity });
@@ -331,35 +287,19 @@ export class FillLayerManager extends EventEmitter {
         this.map.triggerRepaint();
     }
     
-    /**
-     * UPDATED: Now just updates the opacity of the currently active layer.
-     */
     async setOpacity(newOpacity) {
-        // 1. Sanitize the input value to be between 0 and 1.
         const clampedOpacity = Math.max(0, Math.min(1, newOpacity));
+        if (clampedOpacity === this.state.opacity) return;
 
-        // 2. If the value hasn't actually changed, do nothing.
-        if (clampedOpacity === this.state.opacity) {
-            return;
-        }
-
-        // 3. Update the manager's internal state.
         this.state.opacity = clampedOpacity;
-
-        // 4. CRITICAL: Directly tell the shader layer about the new opacity.
-        // This is the step that was being missed.
         if (this.shaderLayer) {
             this.shaderLayer.updateStyle({ opacity: clampedOpacity });
-            this.map.triggerRepaint(); // Tell the map it needs to redraw.
+            this.map.triggerRepaint();
         }
 
-        // 5. Notify the React UI that the state has changed so the slider knob updates.
         this._emitStateChange();
     }
     
-    /**
-     * NEW: Centralized method to emit state changes to the UI.
-     */
     _emitStateChange() {
         const { colormap, baseUnit } = this._getColormapForVariable(this.state.variable);
         const toUnit = this._getTargetUnit(baseUnit, this.state.units);
@@ -368,7 +308,7 @@ export class FillLayerManager extends EventEmitter {
         let availableTimestamps = [];
         if (this.state.isMRMS && this.state.variable && this.mrmsStatus) {
             const timestamps = this.mrmsStatus[this.state.variable] || [];
-            availableTimestamps = [...timestamps].reverse(); // Keep descending order for UI
+            availableTimestamps = [...timestamps].reverse();
         }
 
         this.emit('state:change', {
@@ -384,9 +324,6 @@ export class FillLayerManager extends EventEmitter {
         });
     }
 
-    /**
-     * UPDATED: Destroy method now cleans up all generated time layers.
-     */
     destroy() {
         this.pause();
         this.stopAutoRefresh();
@@ -401,10 +338,6 @@ export class FillLayerManager extends EventEmitter {
         this.callbacks = {};
         console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
     }
-
-    // --- Unchanged or Minorly Adapted Helper Methods ---
-    // (The following methods are kept from your original code, as they are
-    // still needed and function correctly within the new architecture.)
 
     getAvailableVariables(modelName = null) {
         const model = modelName || this.state.model;
@@ -522,22 +455,21 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-    // This is the data fetching logic. It remains largely the same, but now populates the cache
-    // that the layer initialization process reads from.
     async _loadGridData(state) {
         const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = state;
 
-        let dataUrlIdentifier, dataUrl;
+        let resourcePath;
+        let dataUrlIdentifier;
 
         if (isMRMS) {
             if (!mrmsTimestamp) return null;
             const mrmsDate = new Date(mrmsTimestamp * 1000);
             const y = mrmsDate.getUTCFullYear(), m = (mrmsDate.getUTCMonth() + 1).toString().padStart(2, '0'), d = mrmsDate.getUTCDate().toString().padStart(2, '0');
             dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${smoothing || ''}`;
-            dataUrl = `${this.baseUrl}/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
+            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
         } else {
             dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
-            dataUrl = `${this.baseUrl}/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
+            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
         }
 
         if (this.dataCache.has(dataUrlIdentifier)) {
@@ -545,9 +477,25 @@ export class FillLayerManager extends EventEmitter {
         }
 
         const loadPromise = (async () => {
+            if (!this.apiKey) {
+                throw new Error('API key is not configured. Please provide an apiKey in the FillLayerManager options.');
+            }
+
             try {
-                const response = await fetch(dataUrl);
-                if (!response.ok) throw new Error(`HTTP ${response.status} for ${dataUrl}`);
+                const signedUrlResponse = await fetch(`${this.gatekeeperApiUrl}/?resourcePath=${encodeURIComponent(resourcePath)}`, {
+                    headers: {
+                        'x-api-key': this.apiKey
+                    }
+                });
+
+                if (!signedUrlResponse.ok) {
+                    const errorText = await signedUrlResponse.text();
+                    throw new Error(`Failed to get signed URL: ${signedUrlResponse.status} - ${errorText}`);
+                }
+                const { signedUrl } = await signedUrlResponse.json();
+
+                const response = await fetch(signedUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status} for signed URL`);
                 
                 const { data: b64Data, encoding } = await response.json();
                 const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
@@ -560,8 +508,8 @@ export class FillLayerManager extends EventEmitter {
                 this.worker.postMessage({ requestId, compressedData, encoding }, [compressedData.buffer]);
                 return workerPromise;
             } catch (error) {
-                console.error(`Failed to load from ${dataUrl}:`, error);
-                this.dataCache.delete(dataUrlIdentifier); // Evict failed promise
+                console.error(`Failed to load data for path ${resourcePath}:`, error);
+                this.dataCache.delete(dataUrlIdentifier);
                 return null;
             }
         })();
@@ -571,44 +519,23 @@ export class FillLayerManager extends EventEmitter {
     }
 
     _getColormapForVariable(variable) {
-        if (!variable) {
-            return { colormap: [], baseUnit: '' };
-        }
-
-        // Use an alias if one is defined in the dictionaries (e.g., MergedReflectivityQCComposite_00.50 -> refc_0)
+        if (!variable) return { colormap: [], baseUnit: '' };
         const colormapKey = DICTIONARIES.variable_cmap[variable] || variable;
-
-        // 1. Check for a user-provided custom colormap first.
         const customColormap = this.customColormaps[colormapKey];
         if (customColormap && customColormap.colormap) {
-            return {
-                colormap: customColormap.colormap,
-                baseUnit: customColormap.baseUnit || ''
-            };
+            return { colormap: customColormap.colormap, baseUnit: customColormap.baseUnit || '' };
         }
-
-        // 2. If not found, fall back to the default colormaps library.
         const defaultColormapData = DEFAULT_COLORMAPS[colormapKey];
         if (defaultColormapData && defaultColormapData.units) {
-            // Get the list of available units for this variable (e.g., 'dBZ', 'mm')
             const availableUnits = Object.keys(defaultColormapData.units);
-            
             if (availableUnits.length > 0) {
-                // Use the first available unit as the base unit
                 const baseUnit = availableUnits[0];
                 const unitData = defaultColormapData.units[baseUnit];
-
                 if (unitData && unitData.colormap) {
-                    // Successfully found a default colormap
-                    return {
-                        colormap: unitData.colormap,
-                        baseUnit: baseUnit
-                    };
+                    return { colormap: unitData.colormap, baseUnit: baseUnit };
                 }
             }
         }
-
-        // 3. If no colormap is found anywhere, log a warning and return a safe default.
         console.warn(`[FillLayerManager] Colormap not found for variable "${variable}" (resolved key: "${colormapKey}").`);
         return { colormap: [], baseUnit: '' };
     }
@@ -635,14 +562,10 @@ export class FillLayerManager extends EventEmitter {
         if (gridType === 'latlon') {
             let { lon_first, lat_first, lat_last, lon_last, dx_degrees, dy_degrees } = gridDef.grid_params;
             corners = {
-                lon_tl: lon_first,
-                lat_tl: lat_first,
-                lon_tr: lon_last !== undefined ? lon_last : (lon_first + (nx - 1) * dx_degrees),
-                lat_tr: lat_first,
-                lon_bl: lon_first,
-                lat_bl: lat_last !== undefined ? lat_last : (lat_first + (ny - 1) * dy_degrees),
-                lon_br: lon_last !== undefined ? lon_last : (lon_first + (nx - 1) * dx_degrees),
-                lat_br: lat_last !== undefined ? lat_last : (lat_first + (ny - 1) * dy_degrees),
+                lon_tl: lon_first, lat_tl: lat_first,
+                lon_tr: lon_last !== undefined ? lon_last : (lon_first + (nx - 1) * dx_degrees), lat_tr: lat_first,
+                lon_bl: lon_first, lat_bl: lat_last !== undefined ? lat_last : (lat_first + (ny - 1) * dy_degrees),
+                lon_br: lon_last !== undefined ? lon_last : (lon_first + (nx - 1) * dx_degrees), lat_br: lat_last !== undefined ? lat_last : (lat_first + (ny - 1) * dy_degrees),
             };
         } else if (gridType === 'rotated_latlon') {
             const [lon_tl, lat_tl] = hrdpsObliqueTransform(gridDef.grid_params.lon_first, gridDef.grid_params.lat_first);
@@ -650,7 +573,7 @@ export class FillLayerManager extends EventEmitter {
             const [lon_bl, lat_bl] = hrdpsObliqueTransform(gridDef.grid_params.lon_first, gridDef.grid_params.lat_first + (ny - 1) * gridDef.grid_params.dy_degrees);
             const [lon_br, lat_br] = hrdpsObliqueTransform(gridDef.grid_params.lon_first + (nx - 1) * gridDef.grid_params.dx_degrees, gridDef.grid_params.lat_first + (ny - 1) * gridDef.grid_params.dy_degrees);
             corners = { lon_tl, lat_tl, lon_tr, lat_tr, lon_bl, lat_bl, lon_br, lat_br };
-        } else if (gridType === 'lambert_conformal_conic' || gridType === 'polar_stereographic') {
+        } else if (gridType === 'lambert_conformal_conic' || gridType === 'polar_ stereographic') {
             let projString = Object.entries(gridDef.proj_params).map(([k,v]) => `+${k}=${v}`).join(' ');
             if(gridType === 'polar_stereographic') projString += ' +lat_0=90';
             const { x_origin, y_origin, dx, dy } = gridDef.grid_params;
