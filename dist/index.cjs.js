@@ -9444,4 +9444,3 @@ class MapManager extends EventEmitter {
 
 exports.FillLayerManager = FillLayerManager;
 exports.MapManager = MapManager;
-//# sourceMappingURL=index.cjs.js.map

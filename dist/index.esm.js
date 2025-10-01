@@ -9441,4 +9441,3 @@ class MapManager extends EventEmitter {
 }
 
 export { FillLayerManager, MapManager };
-//# sourceMappingURL=index.esm.js.map
