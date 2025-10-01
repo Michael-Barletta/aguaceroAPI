@@ -1,6 +1,6 @@
+// rollup.config.js
+
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-// --- THIS IS THE CHANGE ---
-// We now use a "default import" because the plugin is a CommonJS module.
 import javascriptObfuscator from 'rollup-plugin-javascript-obfuscator';
 
 export default {
@@ -10,7 +10,7 @@ export default {
     {
       file: 'dist/index.cjs.js',
       format: 'cjs',
-      sourcemap: false, 
+      sourcemap: false,
     },
     {
       file: 'dist/index.esm.js',
@@ -24,36 +24,39 @@ export default {
   plugins: [
     nodeResolve(),
     
-    // The rest of the code remains exactly the same.
-    // The plugin is now correctly imported and can be used directly.
+    // --- NEW: More Aggressive Obfuscation Settings ---
     javascriptObfuscator({
       options: {
-        compact: true,
+        // This is the most powerful option. It restructures your code with a while/switch statement.
         controlFlowFlattening: true,
-        controlFlowFlatteningThreshold: 0.75,
+        controlFlowFlatteningThreshold: 1, // Apply to 100% of applicable nodes
+
+        // Adds random "dead" code blocks to further confuse analysis.
         deadCodeInjection: true,
-        deadCodeInjectionThreshold: 0.4,
-        debugProtection: false,
-        debugProtectionInterval: 0,
-        disableConsoleOutput: false,
-        identifierNamesGenerator: 'hexadecimal',
-        log: false,
-        numbersToExpressions: true,
-        renameGlobals: false,
+        deadCodeInjectionThreshold: 1, // Apply to 100% of applicable nodes
+
+        // Prevents easy debugging with developer tools.
+        debugProtection: true,
+        debugProtectionInterval: 4000, // Runs the debugger check every 4 seconds
+
+        // Removes console.log, console.info, etc., from the output.
+        disableConsoleOutput: true,
+
+        // Makes the code self-defending against beautifiers/formatters.
         selfDefending: true,
-        simplify: true,
-        splitStrings: true,
-        splitStringsChunkLength: 10,
+
+        // Encodes all strings into a central array and retrieves them by an index.
         stringArray: true,
-        stringArrayCallsTransform: true,
-        stringArrayEncoding: ['base64'],
-        stringArrayIndexShift: true,
-        stringArrayRotate: true,
-        stringArrayShuffle: true,
-        stringArrayWrappersCount: 2,
-        stringArrayWrappersType: 'variable',
-        stringArrayWrappersParametersMaxCount: 4,
-        transformObjectKeys: true,
+        stringArrayEncoding: ['rc4'], // Use a stronger encoding
+        stringArrayThreshold: 1,
+        rotateStringArray: true,
+        
+        // Renames properties, but use with caution. Let's keep it off for now to ensure API compatibility.
+        transformObjectKeys: false, 
+
+        // Standard minification options
+        compact: true,
+        simplify: true,
         unicodeEscapeSequence: false
       }
     })
