@@ -1,8 +1,7 @@
-// rollup.config.js
-
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-// 1. Import the obfuscator plugin
-import { javascriptObfuscator } from 'rollup-plugin-javascript-obfuscator';
+// --- THIS IS THE CHANGE ---
+// We now use a "default import" because the plugin is a CommonJS module.
+import javascriptObfuscator from 'rollup-plugin-javascript-obfuscator';
 
 export default {
   input: 'src/index.js',
@@ -11,13 +10,11 @@ export default {
     {
       file: 'dist/index.cjs.js',
       format: 'cjs',
-      // 2. IMPORTANT: Turn off sourcemaps for the protected build
       sourcemap: false, 
     },
     {
       file: 'dist/index.esm.js',
       format: 'esm',
-      // 2. IMPORTANT: Turn off sourcemaps for the protected build
       sourcemap: false,
     }
   ],
@@ -27,10 +24,9 @@ export default {
   plugins: [
     nodeResolve(),
     
-    // 3. Add the obfuscator plugin to the end of your plugins array
+    // The rest of the code remains exactly the same.
+    // The plugin is now correctly imported and can be used directly.
     javascriptObfuscator({
-      // A simple but effective configuration for strong protection.
-      // See the javascript-obfuscator GitHub page for all options.
       options: {
         compact: true,
         controlFlowFlattening: true,
