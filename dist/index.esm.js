@@ -8394,7 +8394,7 @@ class FillLayerManager extends EventEmitter {
 
         this.layerId = options.id || `weather-layer-${Math.random().toString(36).substr(2, 9)}`;
         this.apiKey = options.apiKey;
-        this.gatekeeperApiUrl = 'https://jz6j3fl7dh.execute-api.us-east-2.amazonaws.com/default';
+        this.baseGridUrl = 'https://d3dc62msmxkrd7.cloudfront.net';
         this.worker = this.createWorker();
         this.workerRequestId = 0;
         this.workerResolvers = new Map();
@@ -8826,20 +8826,18 @@ class FillLayerManager extends EventEmitter {
             }
 
             try {
-                const signedUrlResponse = await fetch(`${this.gatekeeperApiUrl}/?resourcePath=${encodeURIComponent(resourcePath)}`, {
+                // --- ENTIRE LOGIC REPLACED ---
+                const directUrl = `${this.baseGridUrl}${resourcePath}`;
+                
+                const response = await fetch(directUrl, {
                     headers: {
                         'x-api-key': this.apiKey
                     }
                 });
 
-                if (!signedUrlResponse.ok) {
-                    const errorText = await signedUrlResponse.text();
-                    throw new Error(`Failed to get signed URL: ${signedUrlResponse.status} - ${errorText}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch grid data: ${response.status} ${response.statusText}`);
                 }
-                const { signedUrl } = await signedUrlResponse.json();
-
-                const response = await fetch(signedUrl);
-                if (!response.ok) throw new Error(`HTTP ${response.status} for signed URL`);
                 
                 const { data: b64Data, encoding } = await response.json();
                 const compressedData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
@@ -8851,6 +8849,7 @@ class FillLayerManager extends EventEmitter {
                 
                 this.worker.postMessage({ requestId, compressedData, encoding }, [compressedData.buffer]);
                 return workerPromise;
+
             } catch (error) {
                 console.error(`Failed to load data for path ${resourcePath}:`, error);
                 this.dataCache.delete(dataUrlIdentifier);
