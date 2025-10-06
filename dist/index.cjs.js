@@ -8801,7 +8801,7 @@ class FillLayerManager extends EventEmitter {
         }
     }
 
-    async _loadGridData(state) {
+async _loadGridData(state) {
         const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = state;
 
         let resourcePath;
@@ -8828,9 +8828,10 @@ class FillLayerManager extends EventEmitter {
             }
 
             try {
-                // --- ENTIRE LOGIC REPLACED ---
-                const directUrl = `${this.baseGridUrl}${resourcePath}`;
+                // --- EDITED CODE: Add the apiKey as a URL parameter ---
+                const directUrl = `${this.baseGridUrl}${resourcePath}?apiKey=${this.apiKey}`;
                 
+                // --- EDITED CODE: Send the apiKey in the header as well ---
                 const response = await fetch(directUrl, {
                     headers: {
                         'x-api-key': this.apiKey
