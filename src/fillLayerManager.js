@@ -78,7 +78,8 @@ export class FillLayerManager extends EventEmitter {
             visible: true, 
             opacity: userLayerOptions.opacity ?? 0.85, 
             units: options.initialUnit || 'imperial',
-            smoothing: options.defaultSmoothing ?? 1
+            smoothing: options.smoothing ?? 0,
+            shaderSmoothingEnabled: true
         };
         
         this.autoRefreshEnabled = options.autoRefresh ?? false;
@@ -142,21 +143,31 @@ export class FillLayerManager extends EventEmitter {
         const modelChanged = 'model' in newState && newState.model !== previousState.model;
         const modeChanged = 'isMRMS' in newState && newState.isMRMS !== previousState.isMRMS;
         const unitsChanged = 'units' in newState && newState.units !== previousState.units;
-        const smoothingChanged = 'smoothing' in newState && newState.smoothing !== previousState.smoothing;
+        
+        // Check for changes in BOTH smoothing controls using the correct names
+        const serverSmoothingChanged = 'smoothing' in newState && newState.smoothing !== previousState.smoothing;
+        const shaderSmoothingChanged = 'shaderSmoothingEnabled' in newState && newState.shaderSmoothingEnabled !== previousState.shaderSmoothingEnabled;
 
-        const needsFullRebuild = variableChanged || runChanged || modelChanged || modeChanged;
-        const onlyTimeChanged = !needsFullRebuild && ('forecastHour' in newState || 'mrmsTimestamp' in newState);
-
-        if (this.shaderLayer) {
-            this.shaderLayer.setSmoothing(this.state.smoothing === 0);
+        // Use the dedicated boolean state to control the shader
+        if (this.shaderLayer && typeof this.shaderLayer.setSmoothing === 'function') {
+            // The shader's method expects a 'noSmoothing' flag, so we invert our boolean state
+            this.shaderLayer.setSmoothing(!this.state.shaderSmoothingEnabled);
         }
+
+        // If the SERVER smoothing value changes, we must refetch all data.
+        const needsFullRebuild = variableChanged || runChanged || modelChanged || modeChanged || serverSmoothingChanged;
+        const onlyTimeChanged = !needsFullRebuild && ('forecastHour' in newState || 'mrmsTimestamp' in newState);
 
         if (needsFullRebuild) {
             await this._rebuildLayerAndPreload(this.state);
         } else if (onlyTimeChanged) {
             await this._updateLayerData(this.state);
-        } else if (unitsChanged || smoothingChanged) { 
+        } else if (unitsChanged) {
             this._updateLayerStyle(this.state);
+        }
+
+        // If only the client-side shader smoothing changed, we just need to trigger a repaint
+        if (shaderSmoothingChanged && this.map) {
             this.map.triggerRepaint();
         }
 
@@ -289,6 +300,12 @@ export class FillLayerManager extends EventEmitter {
         }
 
         this.map.triggerRepaint();
+    }
+
+    async setShaderSmoothing(enabled) {
+        if (typeof enabled !== 'boolean' || enabled === this.state.shaderSmoothingEnabled) return;
+        
+        await this.setState({ shaderSmoothingEnabled: enabled });
     }
 
     async setSmoothing(smoothingValue) {
@@ -477,11 +494,14 @@ export class FillLayerManager extends EventEmitter {
             if (!mrmsTimestamp) return null;
             const mrmsDate = new Date(mrmsTimestamp * 1000);
             const y = mrmsDate.getUTCFullYear(), m = (mrmsDate.getUTCMonth() + 1).toString().padStart(2, '0'), d = mrmsDate.getUTCDate().toString().padStart(2, '0');
-            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-0`;
-            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/0`;
+            
+            // CORRECT: Use the `smoothing` variable from state in the URL and cache key.
+            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${smoothing}`;
+            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
         } else {
-            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-0`;
-            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/0`;
+            // CORRECT: Use the `smoothing` variable from state in the URL and cache key.
+            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`;
+            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
         }
 
         if (this.dataCache.has(dataUrlIdentifier)) {
@@ -494,10 +514,8 @@ export class FillLayerManager extends EventEmitter {
             }
 
             try {
-                // --- EDITED CODE: Add the apiKey as a URL parameter ---
                 const directUrl = `${this.baseGridUrl}${resourcePath}?apiKey=${this.apiKey}`;
                 
-                // --- EDITED CODE: Send the apiKey in the header as well ---
                 const response = await fetch(directUrl, {
                     headers: {
                         'x-api-key': this.apiKey
