@@ -78,7 +78,7 @@ export class FillLayerManager extends EventEmitter {
             visible: true, 
             opacity: userLayerOptions.opacity ?? 0.85, 
             units: options.initialUnit || 'imperial',
-            shaderSmoothingEnabled: true
+            shaderSmoothingEnabled: options.shaderSmoothingEnabled ?? true
         };
         
         this.autoRefreshEnabled = options.autoRefresh ?? false;
@@ -103,7 +103,7 @@ export class FillLayerManager extends EventEmitter {
                 grid.encoding, 
                 gridDef.grid_params.nx, 
                 gridDef.grid_params.ny,
-                { useNearestFilter: state.smoothing === 0 } 
+                { useNearestFilter: !state.shaderSmoothingEnabled }
             );
             this.map.triggerRepaint();
         }
@@ -185,15 +185,22 @@ export class FillLayerManager extends EventEmitter {
 
         // 2. Set up the new layer's visual style
         this.shaderLayer = new GridRenderLayer(this.layerId);
+
+        // VVVV --- ADD THIS BLOCK --- VVVV
+        // Ensure the smoothing state is correctly applied to the new layer instance.
+        if (typeof this.shaderLayer.setSmoothing === 'function') {
+            // The shader's method expects a 'noSmoothing' flag, so we invert our boolean state.
+            this.shaderLayer.setSmoothing(!state.shaderSmoothingEnabled);
+        }
+        // ^^^^ --- END OF ADDED BLOCK --- ^^^^
+
         this.map.addLayer(this.shaderLayer, 'AML_-_terrain');
         this._updateLayerStyle(state);
 
         // 3. CRITICAL: Initiate the load for the visible frame.
-        // The 'await' is REMOVED. This is now fire-and-forget.
         this._updateLayerData(state); 
         
         // 4. CRITICAL: Immediately initiate the preload for all other frames.
-        // This is also fire-and-forget and will run at the same time as the call above.
         this._preloadAllTimeSteps(state); 
     }
     

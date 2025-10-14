@@ -205,6 +205,7 @@ export class GridRenderLayer {
         this.u_missing_quantized = gl.getUniformLocation(this.program, "u_missing_quantized");
         this.u_texture_size = gl.getUniformLocation(this.program, "u_texture_size");
         this.u_conversion_type = gl.getUniformLocation(this.program, "u_conversion_type");
+        this.u_no_smoothing = gl.getUniformLocation(this.program, "u_no_smoothing");
 
         this.vertexBuffer = gl.createBuffer();
         this.indexBuffer = gl.createBuffer();
@@ -967,6 +968,7 @@ export class GridRenderLayer {
         gl.enableVertexAttribArray(this.a_texCoord); gl.vertexAttribPointer(this.a_texCoord, 2, gl.FLOAT, false, 16, 8);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform1i(this.u_no_smoothing, this.noSmoothing);
         gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
     }
     

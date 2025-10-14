@@ -226,6 +226,7 @@ class GridRenderLayer {
         this.u_missing_quantized = gl.getUniformLocation(this.program, "u_missing_quantized");
         this.u_texture_size = gl.getUniformLocation(this.program, "u_texture_size");
         this.u_conversion_type = gl.getUniformLocation(this.program, "u_conversion_type");
+        this.u_no_smoothing = gl.getUniformLocation(this.program, "u_no_smoothing");
 
         this.vertexBuffer = gl.createBuffer();
         this.indexBuffer = gl.createBuffer();
@@ -968,6 +969,7 @@ class GridRenderLayer {
         gl.enableVertexAttribArray(this.a_texCoord); gl.vertexAttribPointer(this.a_texCoord, 2, gl.FLOAT, false, 16, 8);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform1i(this.u_no_smoothing, this.noSmoothing);
         gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
     }
     
@@ -8485,7 +8487,7 @@ class FillLayerManager extends EventEmitter {
             visible: true, 
             opacity: userLayerOptions.opacity ?? 0.85, 
             units: options.initialUnit || 'imperial',
-            shaderSmoothingEnabled: true
+            shaderSmoothingEnabled: options.shaderSmoothingEnabled ?? true
         };
         
         this.autoRefreshEnabled = options.autoRefresh ?? false;
@@ -8510,7 +8512,7 @@ class FillLayerManager extends EventEmitter {
                 grid.encoding, 
                 gridDef.grid_params.nx, 
                 gridDef.grid_params.ny,
-                { useNearestFilter: state.smoothing === 0 } 
+                { useNearestFilter: !state.shaderSmoothingEnabled }
             );
             this.map.triggerRepaint();
         }
@@ -8592,15 +8594,22 @@ class FillLayerManager extends EventEmitter {
 
         // 2. Set up the new layer's visual style
         this.shaderLayer = new GridRenderLayer(this.layerId);
+
+        // VVVV --- ADD THIS BLOCK --- VVVV
+        // Ensure the smoothing state is correctly applied to the new layer instance.
+        if (typeof this.shaderLayer.setSmoothing === 'function') {
+            // The shader's method expects a 'noSmoothing' flag, so we invert our boolean state.
+            this.shaderLayer.setSmoothing(!state.shaderSmoothingEnabled);
+        }
+        // ^^^^ --- END OF ADDED BLOCK --- ^^^^
+
         this.map.addLayer(this.shaderLayer, 'AML_-_terrain');
         this._updateLayerStyle(state);
 
         // 3. CRITICAL: Initiate the load for the visible frame.
-        // The 'await' is REMOVED. This is now fire-and-forget.
         this._updateLayerData(state); 
         
         // 4. CRITICAL: Immediately initiate the preload for all other frames.
-        // This is also fire-and-forget and will run at the same time as the call above.
         this._preloadAllTimeSteps(state); 
     }
     
