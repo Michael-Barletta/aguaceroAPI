@@ -1,4 +1,4 @@
-import mapboxgl, { MercatorCoordinate } from 'mapbox-gl';
+import { MercatorCoordinate } from 'mapbox-gl';
 import proj4 from 'proj4';
 
 const MERCATOR_SAFE_LIMIT = 89;
@@ -53,6 +53,11 @@ export class GridRenderLayer {
         this.dataTextureArray = null; // NEW: Will hold all timesteps
         this.currentTimestep = 0; // NEW: Which layer to display
         this.timestepCount = 0;
+        this.noSmoothing = false;
+    }
+
+    setSmoothing(noSmoothing) {
+        this.noSmoothing = noSmoothing;
     }
 
     onAdd(map, gl) {
@@ -69,45 +74,102 @@ export class GridRenderLayer {
                 v_texCoord = a_texCoord;
             }`;
 
+
         const fragmentSource = `
             precision highp float;
             varying vec2 v_texCoord;
+
             uniform sampler2D u_data_texture;
             uniform sampler2D u_colormap_texture;
+
+            uniform vec2 u_texture_size; 
+            uniform bool u_no_smoothing;
+
             uniform float u_scale;
             uniform float u_offset;
             uniform float u_missing_quantized;
+
             uniform float u_opacity;
             uniform vec2 u_data_range;
-            uniform vec2 u_texture_size;
             uniform int u_conversion_type;
+
+            float get_value(vec2 coord) {
+                float value_0_to_255 = texture2D(u_data_texture, coord).r * 255.0;
+                float val = value_0_to_255 - 128.0;
+
+                if (abs(val - u_missing_quantized) < 0.5) {
+                    return 99999.0;
+                }
+                return val;
+            }
 
             float convert_units(float raw_value) {
                 if (u_conversion_type == 1) return raw_value;
                 if (u_conversion_type == 2) return raw_value * 1.8 + 32.0;
-                // ... add other conversions from your full shader if needed ...
                 return raw_value;
             }
 
             void main() {
-                // The GPU handles bilinear interpolation and texture wrapping automatically
-                // because we set TEXTURE_MAG_FILTER to LINEAR and TEXTURE_WRAP_S to REPEAT.
-                // We simply sample the texture at the coordinate provided by the vertex shader.
-                float value_0_to_255 = texture2D(u_data_texture, v_texCoord).r * 255.0;
-                
-                // Convert from the texture's [0, 255] range back to the signed quantized value [-128, 127]
-                float quantized_value = value_0_to_255 - 128.0;
+                float quantized_value;
+                float total_weight = 1.0; // Default to 1.0 for the non-smoothed case
 
-                // Check for the missing data value.
-                if (abs(quantized_value - u_missing_quantized) < 0.5) {
+                if (u_no_smoothing) {
+                    quantized_value = get_value(v_texCoord);
+                } else {
+                    vec2 tex_coord_in_texels = v_texCoord * u_texture_size;
+                    vec2 bl_texel_index = floor(tex_coord_in_texels - 0.5);
+                    vec2 f = fract(tex_coord_in_texels - 0.5);
+
+                    vec2 texel_size = 1.0 / u_texture_size;
+                    vec2 v00_coord = (bl_texel_index + vec2(0.5, 0.5)) * texel_size;
+                    vec2 v10_coord = (bl_texel_index + vec2(1.5, 0.5)) * texel_size;
+                    vec2 v01_coord = (bl_texel_index + vec2(0.5, 1.5)) * texel_size;
+                    vec2 v11_coord = (bl_texel_index + vec2(1.5, 1.5)) * texel_size;
+
+                    float v00 = get_value(v00_coord);
+                    float v10 = get_value(v10_coord);
+                    float v01 = get_value(v01_coord);
+                    float v11 = get_value(v11_coord);
+                    
+                    float total_value = 0.0;
+                    total_weight = 0.0; // Reset for accumulation
+
+                    if (v00 < 99999.0) {
+                        float weight = (1.0 - f.x) * (1.0 - f.y);
+                        total_value += v00 * weight;
+                        total_weight += weight;
+                    }
+                    if (v10 < 99999.0) {
+                        float weight = f.x * (1.0 - f.y);
+                        total_value += v10 * weight;
+                        total_weight += weight;
+                    }
+                    if (v01 < 99999.0) {
+                        float weight = (1.0 - f.x) * f.y;
+                        total_value += v01 * weight;
+                        total_weight += weight;
+                    }
+                    if (v11 < 99999.0) {
+                        float weight = f.x * f.y;
+                        total_value += v11 * weight;
+                        total_weight += weight;
+                    }
+
+                    if (total_weight <= 0.0) {
+                        discard;
+                    }
+                    
+                    quantized_value = total_value / total_weight;
+                }
+
+                if (quantized_value >= 99999.0) {
                     discard;
                 }
 
-                // De-quantize, convert units, and apply the colormap as before.
                 float raw_value = quantized_value * u_scale + u_offset;
                 float converted_value = convert_units(raw_value);
 
-                if (converted_value < u_data_range.x || converted_value > u_data_range.y) {
+                if (converted_value < u_data_range.x) {
                     discard;
                 }
                 
@@ -118,7 +180,12 @@ export class GridRenderLayer {
                     discard;
                 }
 
-                gl_FragColor = vec4(color.rgb, color.a * u_opacity);
+                // --- THE FINAL FIX ---
+                // The alpha is the color's alpha modulated by the total weight of valid neighbors.
+                // This naturally feathers the edge from opaque (weight=1) to transparent (weight=0).
+                float final_alpha = color.a * u_opacity * total_weight;
+
+                gl_FragColor = vec4(color.rgb, final_alpha);
             }`;
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, vertexSource); gl.compileShader(vertexShader);
@@ -327,6 +394,10 @@ export class GridRenderLayer {
                 const lonSpan = Math.abs(adjustedCorners.lon_tr - adjustedCorners.lon_tl);
                 const crossesDateline = lonSpan > 180;
                 
+                // NEW: Track texture coordinate ranges
+                let minTexU = Infinity, maxTexU = -Infinity;
+                let minTexV = Infinity, maxTexV = -Infinity;
+                
                 for (let row = 0; row <= subdivisions; row++) {
                     for (let col = 0; col <= subdivisions; col++) {
                         const t_x = col / subdivisions;
@@ -337,10 +408,16 @@ export class GridRenderLayer {
                         let tex_v;
 
                         if (isFlippedGrid && !isIconD2Type && !isIconEUType) {
-                            tex_v = (1.0 - t_y); // Flip vertically for flipped grids or ICON models
+                            tex_v = (1.0 - t_y);
                         } else {
-                            tex_v = t_y; // Normal orientation
+                            tex_v = t_y;
                         }
+                        
+                        // NEW: Track ranges
+                        minTexU = Math.min(minTexU, tex_u);
+                        maxTexU = Math.max(maxTexU, tex_u);
+                        minTexV = Math.min(minTexV, tex_v);
+                        maxTexV = Math.max(maxTexV, tex_v);
                         
                         // Calculate interpolated coordinates
                         let lon, lat;
@@ -808,7 +885,7 @@ export class GridRenderLayer {
         }
     }
 
-     updateDataTexture(data, encoding, width, height, options = {}) {
+    updateDataTexture(data, encoding, width, height, options = {}) {
         if (!this.gl) return;
 
         this.encoding = encoding;
@@ -825,15 +902,11 @@ export class GridRenderLayer {
         this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
 
-        // --- THE FIX ---
-        // Conditionally set the filtering mode based on the options passed.
-        // Use NEAREST for sharp, pixelated data (like MRMS) and LINEAR for smooth data (like models).
-        const filterMode = options.useNearestFilter ? this.gl.NEAREST : this.gl.LINEAR;
-        
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
+        // --- EDITED: ALWAYS use NEAREST filtering. ---
+        // The shader will now handle all smoothing logic.
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
 
-        // Wrapping mode remains unchanged.
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
     }
@@ -885,7 +958,7 @@ export class GridRenderLayer {
         gl.uniform1f(this.u_scale, this.encoding.scale);
         gl.uniform1f(this.u_offset, this.encoding.offset);
         gl.uniform1f(this.u_missing_quantized, this.encoding.missing_quantized || 127);
-        gl.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight);
+        gl.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight); 
         gl.uniform1i(this.u_conversion_type, this.currentConversion.type);
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.dataTexture); gl.uniform1i(this.u_data_texture, 0);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.colormapTexture); gl.uniform1i(this.u_colormap_texture, 1);

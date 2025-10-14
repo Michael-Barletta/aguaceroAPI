@@ -77,19 +77,16 @@ export class FillLayerManager extends EventEmitter {
             forecastHour: 0, 
             visible: true, 
             opacity: userLayerOptions.opacity ?? 0.85, 
-            units: options.initialUnit || 'imperial' 
+            units: options.initialUnit || 'imperial',
+            smoothing: options.defaultSmoothing ?? 1
         };
         
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
         this.autoRefreshIntervalId = null;
 
-        // --- NEW FOR OPTION 2 ---
-        // Defines how many forecast hours to download in a single batch.
         this.PRELOAD_BATCH_SIZE = 5; 
     }
-
-    // --- Core Logic Overhaul ---
 
     async _updateLayerData(state) {
         if (!this.shaderLayer || !state.variable) return;
@@ -100,12 +97,13 @@ export class FillLayerManager extends EventEmitter {
             const gridModel = state.isMRMS ? 'mrms' : state.model;
             const gridDef = this._getGridCornersAndDef(gridModel).gridDef;
             
+            // Remove the hardcoded useNearestFilter logic - smoothing handles this now
             this.shaderLayer.updateDataTexture(
                 grid.data, 
                 grid.encoding, 
                 gridDef.grid_params.nx, 
                 gridDef.grid_params.ny,
-                { useNearestFilter: state.isMRMS } 
+                { useNearestFilter: state.smoothing === 0 } 
             );
             this.map.triggerRepaint();
         }
@@ -144,16 +142,22 @@ export class FillLayerManager extends EventEmitter {
         const modelChanged = 'model' in newState && newState.model !== previousState.model;
         const modeChanged = 'isMRMS' in newState && newState.isMRMS !== previousState.isMRMS;
         const unitsChanged = 'units' in newState && newState.units !== previousState.units;
+        const smoothingChanged = 'smoothing' in newState && newState.smoothing !== previousState.smoothing;
 
         const needsFullRebuild = variableChanged || runChanged || modelChanged || modeChanged;
         const onlyTimeChanged = !needsFullRebuild && ('forecastHour' in newState || 'mrmsTimestamp' in newState);
+
+        if (this.shaderLayer) {
+            this.shaderLayer.setSmoothing(this.state.smoothing === 0);
+        }
 
         if (needsFullRebuild) {
             await this._rebuildLayerAndPreload(this.state);
         } else if (onlyTimeChanged) {
             await this._updateLayerData(this.state);
-        } else if (unitsChanged) {
+        } else if (unitsChanged || smoothingChanged) { 
             this._updateLayerStyle(this.state);
+            this.map.triggerRepaint();
         }
 
         this._emitStateChange();
@@ -286,6 +290,13 @@ export class FillLayerManager extends EventEmitter {
 
         this.map.triggerRepaint();
     }
+
+    async setSmoothing(smoothingValue) {
+        const validValue = Math.max(0, Math.min(10, smoothingValue)); // Clamp between 0-10
+        if (validValue === this.state.smoothing) return;
+        
+        await this.setState({ smoothing: validValue });
+    }
     
     async setOpacity(newOpacity) {
         const clampedOpacity = Math.max(0, Math.min(1, newOpacity));
@@ -321,6 +332,7 @@ export class FillLayerManager extends EventEmitter {
             isPlaying: this.isPlaying,
             colormap: displayColormap,
             colormapBaseUnit: toUnit,
+            smoothing: this.state.smoothing 
         });
     }
 
@@ -455,7 +467,7 @@ export class FillLayerManager extends EventEmitter {
         }
     }
 
-async _loadGridData(state) {
+    async _loadGridData(state) {
         const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = state;
 
         let resourcePath;
@@ -465,11 +477,11 @@ async _loadGridData(state) {
             if (!mrmsTimestamp) return null;
             const mrmsDate = new Date(mrmsTimestamp * 1000);
             const y = mrmsDate.getUTCFullYear(), m = (mrmsDate.getUTCMonth() + 1).toString().padStart(2, '0'), d = mrmsDate.getUTCDate().toString().padStart(2, '0');
-            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${smoothing || ''}`;
-            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
+            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-0`;
+            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/0`;
         } else {
-            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
-            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
+            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-0`;
+            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/0`;
         }
 
         if (this.dataCache.has(dataUrlIdentifier)) {

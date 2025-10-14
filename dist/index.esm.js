@@ -74,73 +74,143 @@ class GridRenderLayer {
         this.dataTextureArray = null; // NEW: Will hold all timesteps
         this.currentTimestep = 0; // NEW: Which layer to display
         this.timestepCount = 0;
+        this.noSmoothing = false;
+    }
+
+    setSmoothing(noSmoothing) {
+        this.noSmoothing = noSmoothing;
     }
 
     onAdd(map, gl) {
         this.map = map;
         this.gl = gl;
 
-        const vertexSource = `
-            attribute vec2 a_position;
-            attribute vec2 a_texCoord;
-            uniform mat4 u_matrix;
-            varying vec2 v_texCoord;
-            void main() {
-                gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
-                v_texCoord = a_texCoord;
-            }`;
 
-        const fragmentSource = `
-            precision highp float;
-            varying vec2 v_texCoord;
-            uniform sampler2D u_data_texture;
-            uniform sampler2D u_colormap_texture;
-            uniform float u_scale;
-            uniform float u_offset;
-            uniform float u_missing_quantized;
-            uniform float u_opacity;
-            uniform vec2 u_data_range;
-            uniform vec2 u_texture_size;
-            uniform int u_conversion_type;
+const vertexSource = `
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
+    uniform mat4 u_matrix;
+    varying vec2 v_texCoord;
+    void main() {
+        gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+        // EDITED: Pass the texture coordinate directly without clamping here.
+        // The fragment shader will handle the necessary adjustments.
+        v_texCoord = a_texCoord;
+    }`;
 
-            float convert_units(float raw_value) {
-                if (u_conversion_type == 1) return raw_value;
-                if (u_conversion_type == 2) return raw_value * 1.8 + 32.0;
-                // ... add other conversions from your full shader if needed ...
-                return raw_value;
+
+const fragmentSource = `
+    precision highp float;
+    varying vec2 v_texCoord;
+
+    uniform sampler2D u_data_texture;
+    uniform sampler2D u_colormap_texture;
+
+    uniform vec2 u_texture_size; 
+    uniform bool u_no_smoothing;
+
+    uniform float u_scale;
+    uniform float u_offset;
+    uniform float u_missing_quantized;
+
+    uniform float u_opacity;
+    uniform vec2 u_data_range;
+    uniform int u_conversion_type;
+
+    float get_value(vec2 coord) {
+        float value_0_to_255 = texture2D(u_data_texture, coord).r * 255.0;
+        float val = value_0_to_255 - 128.0;
+
+        if (abs(val - u_missing_quantized) < 0.5) {
+            return 99999.0;
+        }
+        return val;
+    }
+
+    float convert_units(float raw_value) {
+        if (u_conversion_type == 1) return raw_value;
+        if (u_conversion_type == 2) return raw_value * 1.8 + 32.0;
+        return raw_value;
+    }
+
+    void main() {
+        float quantized_value;
+        float total_weight = 1.0; // Default to 1.0 for the non-smoothed case
+
+        if (u_no_smoothing) {
+            quantized_value = get_value(v_texCoord);
+        } else {
+            vec2 tex_coord_in_texels = v_texCoord * u_texture_size;
+            vec2 bl_texel_index = floor(tex_coord_in_texels - 0.5);
+            vec2 f = fract(tex_coord_in_texels - 0.5);
+
+            vec2 texel_size = 1.0 / u_texture_size;
+            vec2 v00_coord = (bl_texel_index + vec2(0.5, 0.5)) * texel_size;
+            vec2 v10_coord = (bl_texel_index + vec2(1.5, 0.5)) * texel_size;
+            vec2 v01_coord = (bl_texel_index + vec2(0.5, 1.5)) * texel_size;
+            vec2 v11_coord = (bl_texel_index + vec2(1.5, 1.5)) * texel_size;
+
+            float v00 = get_value(v00_coord);
+            float v10 = get_value(v10_coord);
+            float v01 = get_value(v01_coord);
+            float v11 = get_value(v11_coord);
+            
+            float total_value = 0.0;
+            total_weight = 0.0; // Reset for accumulation
+
+            if (v00 < 99999.0) {
+                float weight = (1.0 - f.x) * (1.0 - f.y);
+                total_value += v00 * weight;
+                total_weight += weight;
+            }
+            if (v10 < 99999.0) {
+                float weight = f.x * (1.0 - f.y);
+                total_value += v10 * weight;
+                total_weight += weight;
+            }
+            if (v01 < 99999.0) {
+                float weight = (1.0 - f.x) * f.y;
+                total_value += v01 * weight;
+                total_weight += weight;
+            }
+            if (v11 < 99999.0) {
+                float weight = f.x * f.y;
+                total_value += v11 * weight;
+                total_weight += weight;
             }
 
-            void main() {
-                // The GPU handles bilinear interpolation and texture wrapping automatically
-                // because we set TEXTURE_MAG_FILTER to LINEAR and TEXTURE_WRAP_S to REPEAT.
-                // We simply sample the texture at the coordinate provided by the vertex shader.
-                float value_0_to_255 = texture2D(u_data_texture, v_texCoord).r * 255.0;
-                
-                // Convert from the texture's [0, 255] range back to the signed quantized value [-128, 127]
-                float quantized_value = value_0_to_255 - 128.0;
+            if (total_weight <= 0.0) {
+                discard;
+            }
+            
+            quantized_value = total_value / total_weight;
+        }
 
-                // Check for the missing data value.
-                if (abs(quantized_value - u_missing_quantized) < 0.5) {
-                    discard;
-                }
+        if (quantized_value >= 99999.0) {
+            discard;
+        }
 
-                // De-quantize, convert units, and apply the colormap as before.
-                float raw_value = quantized_value * u_scale + u_offset;
-                float converted_value = convert_units(raw_value);
+        float raw_value = quantized_value * u_scale + u_offset;
+        float converted_value = convert_units(raw_value);
 
-                if (converted_value < u_data_range.x || converted_value > u_data_range.y) {
-                    discard;
-                }
-                
-                float colormap_coord = (converted_value - u_data_range.x) / (u_data_range.y - u_data_range.x);
-                vec4 color = texture2D(u_colormap_texture, vec2(colormap_coord, 0.5));
-                
-                if (color.a < 0.1) {
-                    discard;
-                }
+        if (converted_value < u_data_range.x) {
+             discard;
+        }
+        
+        float colormap_coord = (converted_value - u_data_range.x) / (u_data_range.y - u_data_range.x);
+        vec4 color = texture2D(u_colormap_texture, vec2(colormap_coord, 0.5));
+        
+        if (color.a < 0.1) {
+            discard;
+        }
 
-                gl_FragColor = vec4(color.rgb, color.a * u_opacity);
-            }`;
+        // --- THE FINAL FIX ---
+        // The alpha is the color's alpha modulated by the total weight of valid neighbors.
+        // This naturally feathers the edge from opaque (weight=1) to transparent (weight=0).
+        float final_alpha = color.a * u_opacity * total_weight;
+
+        gl_FragColor = vec4(color.rgb, final_alpha);
+    }`;
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, vertexSource); gl.compileShader(vertexShader);
         const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fragmentShader, fragmentSource); gl.compileShader(fragmentShader);
@@ -323,118 +393,135 @@ class GridRenderLayer {
                     }
                 }
                 
+} else {
+    // Regional grid handling
+    const adjustedCoordValues = [adjustedCorners.lon_tl, adjustedCorners.lat_tl, 
+                            adjustedCorners.lon_tr, adjustedCorners.lat_tr, 
+                            adjustedCorners.lon_bl, adjustedCorners.lat_bl, 
+                            adjustedCorners.lon_br, adjustedCorners.lat_br];
+    
+    if (adjustedCoordValues.some(coord => !isFinite(coord))) {
+        console.error('[GridLayer] Invalid adjusted corner coordinates:', adjustedCorners);
+        return;
+    }
+    
+    // Additional validation: check if latitudes are in valid range
+    const latValues = [adjustedCorners.lat_tl, adjustedCorners.lat_tr, adjustedCorners.lat_bl, adjustedCorners.lat_br];
+    if (latValues.some(lat => lat < -90 || lat > 90)) {
+        console.error('[GridLayer] Invalid latitude values in corners:', adjustedCorners);
+        console.error('[GridLayer] Original corners were:', corners);
+        console.error('[GridLayer] Grid definition:', gridDef);
+        return;
+    }
+    
+    // Calculate longitude span to handle wrapping
+    const lonSpan = Math.abs(adjustedCorners.lon_tr - adjustedCorners.lon_tl);
+    const crossesDateline = lonSpan > 180;
+    
+    // NEW: Track texture coordinate ranges
+    let minTexU = Infinity, maxTexU = -Infinity;
+    let minTexV = Infinity, maxTexV = -Infinity;
+    
+    for (let row = 0; row <= subdivisions; row++) {
+        for (let col = 0; col <= subdivisions; col++) {
+            const t_x = col / subdivisions;
+            const t_y = row / subdivisions;
+            
+            // UPDATED: Texture coordinate calculation with ICON model fix
+            let tex_u = t_x;
+            let tex_v;
+
+            if (isFlippedGrid && !isIconD2Type && !isIconEUType) {
+                tex_v = (1.0 - t_y);
             } else {
-                // Regional grid handling
-                const adjustedCoordValues = [adjustedCorners.lon_tl, adjustedCorners.lat_tl, 
-                                        adjustedCorners.lon_tr, adjustedCorners.lat_tr, 
-                                        adjustedCorners.lon_bl, adjustedCorners.lat_bl, 
-                                        adjustedCorners.lon_br, adjustedCorners.lat_br];
-                
-                if (adjustedCoordValues.some(coord => !isFinite(coord))) {
-                    console.error('[GridLayer] Invalid adjusted corner coordinates:', adjustedCorners);
-                    return;
-                }
-                
-                // Additional validation: check if latitudes are in valid range
-                const latValues = [adjustedCorners.lat_tl, adjustedCorners.lat_tr, adjustedCorners.lat_bl, adjustedCorners.lat_br];
-                if (latValues.some(lat => lat < -90 || lat > 90)) {
-                    console.error('[GridLayer] Invalid latitude values in corners:', adjustedCorners);
-                    console.error('[GridLayer] Original corners were:', corners);
-                    console.error('[GridLayer] Grid definition:', gridDef);
-                    return;
-                }
-                
-                // Calculate longitude span to handle wrapping
-                const lonSpan = Math.abs(adjustedCorners.lon_tr - adjustedCorners.lon_tl);
-                const crossesDateline = lonSpan > 180;
-                
-                for (let row = 0; row <= subdivisions; row++) {
-                    for (let col = 0; col <= subdivisions; col++) {
-                        const t_x = col / subdivisions;
-                        const t_y = row / subdivisions;
-                        
-                        // UPDATED: Texture coordinate calculation with ICON model fix
-                        let tex_u = t_x;
-                        let tex_v;
-
-                        if (isFlippedGrid && !isIconD2Type && !isIconEUType) {
-                            tex_v = (1.0 - t_y); // Flip vertically for flipped grids or ICON models
-                        } else {
-                            tex_v = t_y; // Normal orientation
-                        }
-                        
-                        // Calculate interpolated coordinates
-                        let lon, lat;
-                        
-                        if (crossesDateline) {
-                            // Handle dateline crossing with proper interpolation
-                            let lon_tl = adjustedCorners.lon_tl;
-                            let lon_tr = adjustedCorners.lon_tr;
-                            let lon_bl = adjustedCorners.lon_bl;
-                            let lon_br = adjustedCorners.lon_br;
-                            
-                            // Adjust for dateline crossing
-                            if (lon_tr < lon_tl) lon_tr += 360;
-                            if (lon_br < lon_bl) lon_br += 360;
-                            
-                            // Bilinear interpolation
-                            lon = (1 - t_y) * ((1 - t_x) * lon_tl + t_x * lon_tr) +
-                                t_y * ((1 - t_x) * lon_bl + t_x * lon_br);
-                                
-                            // Normalize back to [-180, 180]
-                            while (lon > 180) lon -= 360;
-                            while (lon < -180) lon += 360;
-                        } else {
-                            // Standard bilinear interpolation
-                            lon = (1 - t_y) * ((1 - t_x) * adjustedCorners.lon_tl + t_x * adjustedCorners.lon_tr) +
-                                t_y * ((1 - t_x) * adjustedCorners.lon_bl + t_x * adjustedCorners.lon_br);
-                        }
-                        
-                        lat = (1 - t_y) * ((1 - t_x) * adjustedCorners.lat_tl + t_x * adjustedCorners.lat_tr) +
-                            t_y * ((1 - t_x) * adjustedCorners.lat_bl + t_x * adjustedCorners.lat_br);
-
-                        lat = Math.max(-MERCATOR_SAFE_LIMIT, Math.min(MERCATOR_SAFE_LIMIT, lat));
-
-                        // Validate coordinates
-                        if (!isFinite(lon) || !isFinite(lat)) {
-                            console.error(`[GridLayer] Invalid interpolated coordinates at ${row},${col}: lon=${lon}, lat=${lat}`);
-                            console.error(`[GridLayer] Interpolation inputs:`, {
-                                t_x, t_y,
-                                corners: adjustedCorners,
-                                gridType: isGFSType ? 'GFS' : (isECMWFType ? 'ECMWF' : (isIconModel ? 'ICON' : 'OTHER'))
-                            });
-                            continue;
-                        }
-
-                        // Normalize longitude to [-180, 180] range
-                        let normalizedLon = lon;
-                        while (normalizedLon > 180) normalizedLon -= 360;
-                        while (normalizedLon < -180) normalizedLon += 360;
-
-                        const mercator = MercatorCoordinate.fromLngLat({ lon: normalizedLon, lat: lat });
-                        
-                        if (!isFinite(mercator.x) || !isFinite(mercator.y)) {
-                            console.error(`[GridLayer] Invalid Mercator coordinates: x=${mercator.x}, y=${mercator.y}`);
-                            continue;
-                        }
-                        
-                        vertices.push(mercator.x, mercator.y, tex_u, tex_v);
-                    }
-                }
-                
-                // Generate indices (unchanged)
-                for (let row = 0; row < subdivisions; row++) {
-                    for (let col = 0; col < subdivisions; col++) {
-                        const topLeft = row * (subdivisions + 1) + col;
-                        const topRight = topLeft + 1;
-                        const bottomLeft = (row + 1) * (subdivisions + 1) + col;
-                        const bottomRight = bottomLeft + 1;
-                        
-                        indices.push(topLeft, bottomLeft, topRight);
-                        indices.push(topRight, bottomLeft, bottomRight);
-                    }
-                }
+                tex_v = t_y;
             }
+            
+            // NEW: Track ranges
+            minTexU = Math.min(minTexU, tex_u);
+            maxTexU = Math.max(maxTexU, tex_u);
+            minTexV = Math.min(minTexV, tex_v);
+            maxTexV = Math.max(maxTexV, tex_v);
+            
+            // Calculate interpolated coordinates
+            let lon, lat;
+            
+            if (crossesDateline) {
+                // Handle dateline crossing with proper interpolation
+                let lon_tl = adjustedCorners.lon_tl;
+                let lon_tr = adjustedCorners.lon_tr;
+                let lon_bl = adjustedCorners.lon_bl;
+                let lon_br = adjustedCorners.lon_br;
+                
+                // Adjust for dateline crossing
+                if (lon_tr < lon_tl) lon_tr += 360;
+                if (lon_br < lon_bl) lon_br += 360;
+                
+                // Bilinear interpolation
+                lon = (1 - t_y) * ((1 - t_x) * lon_tl + t_x * lon_tr) +
+                    t_y * ((1 - t_x) * lon_bl + t_x * lon_br);
+                    
+                // Normalize back to [-180, 180]
+                while (lon > 180) lon -= 360;
+                while (lon < -180) lon += 360;
+            } else {
+                // Standard bilinear interpolation
+                lon = (1 - t_y) * ((1 - t_x) * adjustedCorners.lon_tl + t_x * adjustedCorners.lon_tr) +
+                    t_y * ((1 - t_x) * adjustedCorners.lon_bl + t_x * adjustedCorners.lon_br);
+            }
+            
+            lat = (1 - t_y) * ((1 - t_x) * adjustedCorners.lat_tl + t_x * adjustedCorners.lat_tr) +
+                t_y * ((1 - t_x) * adjustedCorners.lat_bl + t_x * adjustedCorners.lat_br);
+
+            lat = Math.max(-MERCATOR_SAFE_LIMIT, Math.min(MERCATOR_SAFE_LIMIT, lat));
+
+            // Validate coordinates
+            if (!isFinite(lon) || !isFinite(lat)) {
+                console.error(`[GridLayer] Invalid interpolated coordinates at ${row},${col}: lon=${lon}, lat=${lat}`);
+                console.error(`[GridLayer] Interpolation inputs:`, {
+                    t_x, t_y,
+                    corners: adjustedCorners,
+                    gridType: isGFSType ? 'GFS' : (isECMWFType ? 'ECMWF' : (isIconModel ? 'ICON' : 'OTHER'))
+                });
+                continue;
+            }
+
+            // Normalize longitude to [-180, 180] range
+            let normalizedLon = lon;
+            while (normalizedLon > 180) normalizedLon -= 360;
+            while (normalizedLon < -180) normalizedLon += 360;
+
+            const mercator = MercatorCoordinate.fromLngLat({ lon: normalizedLon, lat: lat });
+            
+            if (!isFinite(mercator.x) || !isFinite(mercator.y)) {
+                console.error(`[GridLayer] Invalid Mercator coordinates: x=${mercator.x}, y=${mercator.y}`);
+                continue;
+            }
+            
+            vertices.push(mercator.x, mercator.y, tex_u, tex_v);
+        }
+    }
+    
+    // NEW: Log texture coordinate ranges
+    console.log('[GridLayer] Texture coordinate ranges:', {
+        u: { min: minTexU, max: maxTexU },
+        v: { min: minTexV, max: maxTexV },
+        model: gridDef.modelName
+    });
+    
+    // Generate indices (unchanged)
+    for (let row = 0; row < subdivisions; row++) {
+        for (let col = 0; col < subdivisions; col++) {
+            const topLeft = row * (subdivisions + 1) + col;
+            const topRight = topLeft + 1;
+            const bottomLeft = (row + 1) * (subdivisions + 1) + col;
+            const bottomRight = bottomLeft + 1;
+            
+            indices.push(topLeft, bottomLeft, topRight);
+            indices.push(topRight, bottomLeft, bottomRight);
+        }
+    }
+}
 
             const vertexData = new Float32Array(vertices);
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
@@ -819,35 +906,31 @@ class GridRenderLayer {
         }
     }
 
-     updateDataTexture(data, encoding, width, height, options = {}) {
-        if (!this.gl) return;
+updateDataTexture(data, encoding, width, height, options = {}) {
+    if (!this.gl) return;
 
-        this.encoding = encoding;
-        this.textureWidth = width;
-        this.textureHeight = height;
+    this.encoding = encoding;
+    this.textureWidth = width;
+    this.textureHeight = height;
 
-        const transformedData = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-            const signedValue = data[i] > 127 ? data[i] - 256 : data[i];
-            transformedData[i] = signedValue + 128;
-        }
-
-        this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture);
-        this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
-
-        // --- THE FIX ---
-        // Conditionally set the filtering mode based on the options passed.
-        // Use NEAREST for sharp, pixelated data (like MRMS) and LINEAR for smooth data (like models).
-        const filterMode = options.useNearestFilter ? this.gl.NEAREST : this.gl.LINEAR;
-        
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, filterMode);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, filterMode);
-
-        // Wrapping mode remains unchanged.
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    const transformedData = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+        const signedValue = data[i] > 127 ? data[i] - 256 : data[i];
+        transformedData[i] = signedValue + 128;
     }
+
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture);
+    this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
+    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
+
+    // --- EDITED: ALWAYS use NEAREST filtering. ---
+    // The shader will now handle all smoothing logic.
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+}
     
     updateColormapTexture(colormap) {
         if (!this.gl) return;
@@ -896,7 +979,7 @@ class GridRenderLayer {
         gl.uniform1f(this.u_scale, this.encoding.scale);
         gl.uniform1f(this.u_offset, this.encoding.offset);
         gl.uniform1f(this.u_missing_quantized, this.encoding.missing_quantized || 127);
-        gl.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight);
+        gl.uniform2f(this.u_texture_size, this.textureWidth, this.textureHeight); 
         gl.uniform1i(this.u_conversion_type, this.currentConversion.type);
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.dataTexture); gl.uniform1i(this.u_data_texture, 0);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.colormapTexture); gl.uniform1i(this.u_colormap_texture, 1);
@@ -8421,19 +8504,16 @@ class FillLayerManager extends EventEmitter {
             forecastHour: 0, 
             visible: true, 
             opacity: userLayerOptions.opacity ?? 0.85, 
-            units: options.initialUnit || 'imperial' 
+            units: options.initialUnit || 'imperial',
+            smoothing: options.defaultSmoothing ?? 1
         };
         
         this.autoRefreshEnabled = options.autoRefresh ?? false;
         this.autoRefreshIntervalSeconds = options.autoRefreshInterval ?? 60;
         this.autoRefreshIntervalId = null;
 
-        // --- NEW FOR OPTION 2 ---
-        // Defines how many forecast hours to download in a single batch.
         this.PRELOAD_BATCH_SIZE = 5; 
     }
-
-    // --- Core Logic Overhaul ---
 
     async _updateLayerData(state) {
         if (!this.shaderLayer || !state.variable) return;
@@ -8444,12 +8524,13 @@ class FillLayerManager extends EventEmitter {
             const gridModel = state.isMRMS ? 'mrms' : state.model;
             const gridDef = this._getGridCornersAndDef(gridModel).gridDef;
             
+            // Remove the hardcoded useNearestFilter logic - smoothing handles this now
             this.shaderLayer.updateDataTexture(
                 grid.data, 
                 grid.encoding, 
                 gridDef.grid_params.nx, 
                 gridDef.grid_params.ny,
-                { useNearestFilter: state.isMRMS } 
+                { useNearestFilter: state.smoothing === 0 } 
             );
             this.map.triggerRepaint();
         }
@@ -8488,16 +8569,22 @@ class FillLayerManager extends EventEmitter {
         const modelChanged = 'model' in newState && newState.model !== previousState.model;
         const modeChanged = 'isMRMS' in newState && newState.isMRMS !== previousState.isMRMS;
         const unitsChanged = 'units' in newState && newState.units !== previousState.units;
+        const smoothingChanged = 'smoothing' in newState && newState.smoothing !== previousState.smoothing;
 
         const needsFullRebuild = variableChanged || runChanged || modelChanged || modeChanged;
         const onlyTimeChanged = !needsFullRebuild && ('forecastHour' in newState || 'mrmsTimestamp' in newState);
+
+        if (this.shaderLayer) {
+            this.shaderLayer.setSmoothing(this.state.smoothing === 0);
+        }
 
         if (needsFullRebuild) {
             await this._rebuildLayerAndPreload(this.state);
         } else if (onlyTimeChanged) {
             await this._updateLayerData(this.state);
-        } else if (unitsChanged) {
+        } else if (unitsChanged || smoothingChanged) { 
             this._updateLayerStyle(this.state);
+            this.map.triggerRepaint();
         }
 
         this._emitStateChange();
@@ -8630,6 +8717,13 @@ class FillLayerManager extends EventEmitter {
 
         this.map.triggerRepaint();
     }
+
+    async setSmoothing(smoothingValue) {
+        const validValue = Math.max(0, Math.min(10, smoothingValue)); // Clamp between 0-10
+        if (validValue === this.state.smoothing) return;
+        
+        await this.setState({ smoothing: validValue });
+    }
     
     async setOpacity(newOpacity) {
         const clampedOpacity = Math.max(0, Math.min(1, newOpacity));
@@ -8665,6 +8759,7 @@ class FillLayerManager extends EventEmitter {
             isPlaying: this.isPlaying,
             colormap: displayColormap,
             colormapBaseUnit: toUnit,
+            smoothing: this.state.smoothing 
         });
     }
 
@@ -8799,7 +8894,7 @@ class FillLayerManager extends EventEmitter {
         }
     }
 
-async _loadGridData(state) {
+    async _loadGridData(state) {
         const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = state;
 
         let resourcePath;
@@ -8809,11 +8904,11 @@ async _loadGridData(state) {
             if (!mrmsTimestamp) return null;
             const mrmsDate = new Date(mrmsTimestamp * 1000);
             const y = mrmsDate.getUTCFullYear(), m = (mrmsDate.getUTCMonth() + 1).toString().padStart(2, '0'), d = mrmsDate.getUTCDate().toString().padStart(2, '0');
-            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${smoothing || ''}`;
-            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
+            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-0`;
+            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/0`;
         } else {
-            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing || ''}`;
-            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
+            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-0`;
+            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/0`;
         }
 
         if (this.dataCache.has(dataUrlIdentifier)) {
