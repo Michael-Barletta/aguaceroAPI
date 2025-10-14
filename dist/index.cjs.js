@@ -8518,7 +8518,7 @@ class FillLayerManager extends EventEmitter {
         }
     }
 
-_updateLayerStyle(state) {
+    _updateLayerStyle(state) {
         if (!this.shaderLayer || !state.variable) return;
 
         const gridModel = state.isMRMS ? 'mrms' : state.model;
