@@ -1,6 +1,6 @@
 {
   "name": "@aguacerowx/aguacero-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A high-performance weather data visualization API for Mapbox GL JS.",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
