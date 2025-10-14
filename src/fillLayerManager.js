@@ -78,7 +78,6 @@ export class FillLayerManager extends EventEmitter {
             visible: true, 
             opacity: userLayerOptions.opacity ?? 0.85, 
             units: options.initialUnit || 'imperial',
-            smoothing: options.smoothing ?? 0,
             shaderSmoothingEnabled: true
         };
         
@@ -122,7 +121,8 @@ export class FillLayerManager extends EventEmitter {
         const toUnit = this._getTargetUnit(baseUnit, state.units);
         
         const finalColormap = this._convertColormapUnits(colormap, baseUnit, toUnit);
-        const dataRange = [colormap[0], colormap[colormap.length - 2]];
+
+        const dataRange = [finalColormap[0], finalColormap[finalColormap.length - 2]];
         
         const dataNativeUnit = (DICTIONARIES.fld[state.variable] || {}).defaultUnit || 'none';
 
@@ -307,13 +307,6 @@ export class FillLayerManager extends EventEmitter {
         
         await this.setState({ shaderSmoothingEnabled: enabled });
     }
-
-    async setSmoothing(smoothingValue) {
-        const validValue = Math.max(0, Math.min(10, smoothingValue)); // Clamp between 0-10
-        if (validValue === this.state.smoothing) return;
-        
-        await this.setState({ smoothing: validValue });
-    }
     
     async setOpacity(newOpacity) {
         const clampedOpacity = Math.max(0, Math.min(1, newOpacity));
@@ -349,7 +342,6 @@ export class FillLayerManager extends EventEmitter {
             isPlaying: this.isPlaying,
             colormap: displayColormap,
             colormapBaseUnit: toUnit,
-            smoothing: this.state.smoothing 
         });
     }
 
@@ -485,7 +477,22 @@ export class FillLayerManager extends EventEmitter {
     }
 
     async _loadGridData(state) {
-        const { model, date, run, forecastHour, variable, smoothing = 0, isMRMS, mrmsTimestamp } = state;
+        const { model, date, run, forecastHour, variable, isMRMS, mrmsTimestamp } = state;
+
+        // --- START OF EDITED CODE ---
+
+        // Default smoothing to 0.
+        let effectiveSmoothing = 0;
+
+        // Check for variable-specific settings in the custom colormaps object.
+        const customVariableSettings = this.customColormaps[variable];
+
+        // If settings for this variable exist and a 'smoothing' property is defined, use it.
+        if (customVariableSettings && typeof customVariableSettings.smoothing === 'number') {
+            effectiveSmoothing = customVariableSettings.smoothing;
+        }
+
+        // --- END OF EDITED CODE ---
 
         let resourcePath;
         let dataUrlIdentifier;
@@ -495,13 +502,13 @@ export class FillLayerManager extends EventEmitter {
             const mrmsDate = new Date(mrmsTimestamp * 1000);
             const y = mrmsDate.getUTCFullYear(), m = (mrmsDate.getUTCMonth() + 1).toString().padStart(2, '0'), d = mrmsDate.getUTCDate().toString().padStart(2, '0');
             
-            // CORRECT: Use the `smoothing` variable from state in the URL and cache key.
-            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${smoothing}`;
-            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${smoothing}`;
+            // Use the 'effectiveSmoothing' value in the URL and cache key.
+            dataUrlIdentifier = `mrms-${mrmsTimestamp}-${variable}-${effectiveSmoothing}`;
+            resourcePath = `/grids/mrms/${y}${m}${d}/${mrmsTimestamp}/0/${variable}/${effectiveSmoothing}`;
         } else {
-            // CORRECT: Use the `smoothing` variable from state in the URL and cache key.
-            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${smoothing}`;
-            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/${smoothing}`;
+            // Use the 'effectiveSmoothing' value in the URL and cache key.
+            dataUrlIdentifier = `${model}-${date}-${run}-${forecastHour}-${variable}-${effectiveSmoothing}`;
+            resourcePath = `/grids/${model}/${date}/${run}/${forecastHour}/${variable}/${effectiveSmoothing}`;
         }
 
         if (this.dataCache.has(dataUrlIdentifier)) {
