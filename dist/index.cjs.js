@@ -8867,10 +8867,6 @@ async _loadGridData(state) {
     _getColormapForVariable(variable) {
         if (!variable) return { colormap: [], baseUnit: '' };
 
-        // --- CORRECTED LOGIC ---
-
-        // 1. First, check for a direct, explicit override in customColormaps.
-        // This gives top priority to user-defined colormaps for specific variables.
         if (this.customColormaps[variable] && this.customColormaps[variable].colormap) {
             return {
                 colormap: this.customColormaps[variable].colormap,
@@ -8878,13 +8874,8 @@ async _loadGridData(state) {
             };
         }
 
-        // 2. If no direct override exists, then determine the fallback colormap key.
-        // This key might be a generic one from DICTIONARIES.variable_cmap (e.g., 'refc_0')
-        // or the variable name itself if no mapping exists.
         const colormapKey = DICTIONARIES.variable_cmap[variable] || variable;
 
-        // 3. Check if the generic fallback key has a custom definition.
-        // This allows a user to customize a generic colormap like 'refc_0'.
         const customColormap = this.customColormaps[colormapKey];
         if (customColormap && customColormap.colormap) {
             return {
@@ -8893,7 +8884,6 @@ async _loadGridData(state) {
             };
         }
 
-        // 4. If no custom definitions are found, look for the key in the default colormaps.
         const defaultColormapData = DEFAULT_COLORMAPS[colormapKey];
         if (defaultColormapData && defaultColormapData.units) {
             const availableUnits = Object.keys(defaultColormapData.units);
@@ -8906,8 +8896,6 @@ async _loadGridData(state) {
             }
         }
 
-        // 5. If no colormap is found anywhere, warn the user.
-        console.warn(`[FillLayerManager] Colormap not found for variable "${variable}" (resolved key: "${colormapKey}").`);
         return { colormap: [], baseUnit: '' };
     }
 
