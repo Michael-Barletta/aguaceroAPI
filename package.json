@@ -10,7 +10,9 @@
   ],
   "scripts": {
     "build": "rollup -c",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "peerDependencies": {
     "mapbox-gl": "^2.0.0 || ^3.0.0",
@@ -20,7 +22,7 @@
     "@rollup/plugin-node-resolve": "^15.2.3",
     "javascript-obfuscator": "^4.1.1",
     "rollup": "^4.9.6",
-    "rollup-plugin-javascript-obfuscator": "^1.1.2"
+    "rollup-plugin-javascript-obfuscator": "^1.0.4"
   },
   "author": "Michael Barletta",
   "license": "MIT",
@@ -34,6 +36,6 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-github-username/aguacero-api.git"
+    "url": "https://github.com/yourusername/aguacero-api.git"
   }
 }

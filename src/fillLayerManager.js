@@ -520,11 +520,24 @@ async _loadGridData(state) {
 
     _getColormapForVariable(variable) {
         if (!variable) return { colormap: [], baseUnit: '' };
+
+        if (this.customColormaps[variable] && this.customColormaps[variable].colormap) {
+            return {
+                colormap: this.customColormaps[variable].colormap,
+                baseUnit: this.customColormaps[variable].baseUnit || ''
+            };
+        }
+
         const colormapKey = DICTIONARIES.variable_cmap[variable] || variable;
+
         const customColormap = this.customColormaps[colormapKey];
         if (customColormap && customColormap.colormap) {
-            return { colormap: customColormap.colormap, baseUnit: customColormap.baseUnit || '' };
+            return {
+                colormap: customColormap.colormap,
+                baseUnit: customColormap.baseUnit || ''
+            };
         }
+
         const defaultColormapData = DEFAULT_COLORMAPS[colormapKey];
         if (defaultColormapData && defaultColormapData.units) {
             const availableUnits = Object.keys(defaultColormapData.units);
@@ -536,7 +549,7 @@ async _loadGridData(state) {
                 }
             }
         }
-        console.warn(`[FillLayerManager] Colormap not found for variable "${variable}" (resolved key: "${colormapKey}").`);
+
         return { colormap: [], baseUnit: '' };
     }
 
