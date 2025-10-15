@@ -8467,7 +8467,6 @@ class FillLayerManager extends EventEmitter {
         this.playIntervalId = null;
         this.playbackSpeed = options.playbackSpeed || 500;
         this.customColormaps = options.customColormaps || {};
-        this.currentLoadedTimeKey = null;
         
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || null;
