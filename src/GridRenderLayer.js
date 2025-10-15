@@ -893,15 +893,10 @@ export class GridRenderLayer {
         this.textureWidth = width;
         this.textureHeight = height;
 
-        const transformedData = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-            const signedValue = data[i] > 127 ? data[i] - 256 : data[i];
-            transformedData[i] = signedValue + 128;
-        }
-
+        // Data is already transformed, just upload it
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture);
         this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, data);
 
         // --- EDITED: ALWAYS use NEAREST filtering. ---
         // The shader will now handle all smoothing logic.

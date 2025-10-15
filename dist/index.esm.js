@@ -894,15 +894,10 @@ class GridRenderLayer {
         this.textureWidth = width;
         this.textureHeight = height;
 
-        const transformedData = new Uint8Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-            const signedValue = data[i] > 127 ? data[i] - 256 : data[i];
-            transformedData[i] = signedValue + 128;
-        }
-
+        // Data is already transformed, just upload it
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.dataTexture);
         this.gl.pixelStorei(this.gl.UNPACK_ALIGNMENT, 1);
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, transformedData);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.LUMINANCE, width, height, 0, this.gl.LUMINANCE, this.gl.UNSIGNED_BYTE, data);
 
         // --- EDITED: ALWAYS use NEAREST filtering. ---
         // The shader will now handle all smoothing logic.
@@ -8472,6 +8467,7 @@ class FillLayerManager extends EventEmitter {
         this.playIntervalId = null;
         this.playbackSpeed = options.playbackSpeed || 500;
         this.customColormaps = options.customColormaps || {};
+        this.currentLoadedTimeKey = null;
         
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || null;
@@ -8500,13 +8496,18 @@ class FillLayerManager extends EventEmitter {
     async _updateLayerData(state) {
         if (!this.shaderLayer || !state.variable) return;
 
+        // NEW: Check if this data is already loaded in the current texture
+        const timeKey = state.isMRMS ? state.mrmsTimestamp : state.forecastHour;
+        if (this.currentLoadedTimeKey === timeKey) {
+            return; // Data already loaded, no need to update texture
+        }
+
         const grid = await this._loadGridData(state);
 
         if (grid && grid.data) {
             const gridModel = state.isMRMS ? 'mrms' : state.model;
             const gridDef = this._getGridCornersAndDef(gridModel).gridDef;
             
-            // Remove the hardcoded useNearestFilter logic - smoothing handles this now
             this.shaderLayer.updateDataTexture(
                 grid.data, 
                 grid.encoding, 
@@ -8514,6 +8515,10 @@ class FillLayerManager extends EventEmitter {
                 gridDef.grid_params.ny,
                 { useNearestFilter: !state.shaderSmoothingEnabled }
             );
+            
+            // NEW: Track what's currently loaded
+            this.currentLoadedTimeKey = timeKey;
+            
             this.map.triggerRepaint();
         }
     }
@@ -8590,6 +8595,7 @@ class FillLayerManager extends EventEmitter {
             this.shaderLayer = null;
         }
         this.dataCache.clear();
+        this.currentLoadedTimeKey = null;
         if (!state.variable) return;
 
         // 2. Set up the new layer's visual style
@@ -8956,9 +8962,19 @@ class FillLayerManager extends EventEmitter {
                 const workerPromise = new Promise((resolve, reject) => {
                     this.workerResolvers.set(requestId, { resolve, reject });
                 });
-                
+
                 this.worker.postMessage({ requestId, compressedData, encoding }, [compressedData.buffer]);
-                return workerPromise;
+
+                const result = await workerPromise;
+
+                // NEW: Pre-transform the data here, only once
+                const transformedData = new Uint8Array(result.data.length);
+                for (let i = 0; i < result.data.length; i++) {
+                    const signedValue = result.data[i] > 127 ? result.data[i] - 256 : result.data[i];
+                    transformedData[i] = signedValue + 128;
+                }
+
+                return { data: transformedData, encoding };
 
             } catch (error) {
                 console.error(`Failed to load data for path ${resourcePath}:`, error);
