@@ -8590,12 +8590,13 @@ class FillLayerManager extends EventEmitter {
     }
 
     async _rebuildLayerAndPreload(state) {
-        // 1. Clean up old layers and cache
+        // 1. Clean up old layers
         if (this.shaderLayer) {
             this.map.removeLayer(this.shaderLayer.id);
             this.shaderLayer = null;
         }
-        this.dataCache.clear();
+        // The line "this.dataCache.clear();" has been removed from here
+        // to preserve the cache when toggling layers or changing modes.
         this.currentLoadedTimeKey = null;
         if (!state.variable) return;
 
