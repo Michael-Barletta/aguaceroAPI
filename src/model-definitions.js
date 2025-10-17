@@ -37,7 +37,10 @@ export const MODEL_CONFIGS = {
             "VIL_Max_120min_00.50",
             "VIL_Density_00.50",
             "VIL_00.50",
-            "LVL3_HighResVIL_00.50"
+            "LVL3_HighResVIL_00.50",
+            "ptypeRefl", 
+            "MergedAzShear_0-2kmAGL_00.50",
+            "MergedAzShear_3-6kmAGL_00.50",
         ],
         name: 'MRMS',
     },
@@ -119,7 +122,7 @@ export const MODEL_CONFIGS = {
     'hrrr': {
         bounds: [-134.09547, 21.13812300, -60.91719, 52.6156533],
         max_zoom: 7,
-        vars: ['refd_1000', 'vis_0', 'mxrefc_1000', 'gust_runmax', 'skewt', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12',  'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0',  'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'ltng_0', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'w_850', 'cape_0-3000', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'w_700', 'tts', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   'tehi', '2t_2', 'mxuphl_5000', 'mxuphl_5000_runmax', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
+        vars: ['hail', 'refd_1000', 'vis_0', 'mxrefc_1000', 'gust_runmax', 'skewt', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12',  'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0',  'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'ltng_0', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'w_850', 'cape_0-3000', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'w_700', 'tts', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   'tehi', '2t_2', 'mxuphl_5000', 'mxuphl_5000_runmax', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
         category: 'Mesoscale',
         name: 'HRRR',
         pressureLvls: [100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500,525,550,575,600,625,650,675,700,725,750,775,800,825,850,875,900,925,950,975,1000],
@@ -222,7 +225,7 @@ export const MODEL_CONFIGS = {
     'rrfs': {
         bounds: [-134.09547, 21.13812300, -60.91719, 52.6156533],
         max_zoom: 7,
-        vars: ['vis_0', 'gust_runmax', 'tts', 'tehi', 'cape_0-3000', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12', 'crain_24', 'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cicep_24', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'cfrzr_24', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'csnow_24', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'tp_24', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0', 'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   '2t_2', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
+        vars: ['hail', 'vis_0', 'gust_runmax', 'tts', 'tehi', 'cape_0-3000', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12', 'crain_24', 'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cicep_24', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'cfrzr_24', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'csnow_24', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'tp_24', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0', 'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   '2t_2', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
         category: 'Mesoscale',
         name: 'RRFS A',
         skewt: true,
@@ -3507,6 +3510,34 @@ export const DICTIONARIES = {
             
             description: '',
         },
+        "MergedAzShear_0-2kmAGL_00.50": {
+            category: "Rotation",
+            variable: "Rotation Track (Instant)",
+            shortname: "Low-level Rotation",
+            units: {
+                "s⁻¹": {
+                    min: .003,
+                    max: .02,
+                    intervals: [0.001],
+                },
+            },
+            
+            description: '',
+        },
+        "MergedAzShear_3-6kmAGL_00.50": {
+            category: "Rotation",
+            variable: "ML Rotation Track (Instant)",
+            shortname: "Mid-level Rotation",
+            units: {
+                "s⁻¹": {
+                    min: .003,
+                    max: .02,
+                    intervals: [0.001],
+                },
+            },
+            
+            description: '',
+        },
         "RotationTrackML30min_00.50": {
             category: "Rotation",
             variable: "ML Rotation Track (30 min)",
@@ -3675,6 +3706,20 @@ export const DICTIONARIES = {
             
             description: '',
         },
+        "ptypeRefl": {
+            category: "Composite Reflectivity",
+            variable: "Precipitation Type Reflectivity",
+            shortname: "Precip. Type Refl.",
+            units: {
+                "dBZ": {
+                    min: 5,
+                    max: 280,
+                    intervals: [1],
+                },
+            },
+            
+            description: '',
+        },
         "MESH_Max_30min_00.50": {
             category: "Hail",
             variable: "Max Hail Size (30 min)",
@@ -3685,8 +3730,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_60min_00.50": {
@@ -3699,8 +3749,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_120min_00.50": {
@@ -3713,8 +3768,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_240min_00.50": {
@@ -3727,8 +3787,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_360min_00.50": {
@@ -3741,8 +3806,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_1440min_00.50": {
@@ -3755,8 +3825,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_00.50": {
@@ -3769,8 +3844,13 @@ export const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "FLASH_QPE_ARIMAX_00.00": {
@@ -4030,6 +4110,8 @@ export const DICTIONARIES = {
         "RotationTrack240min_00.50": 'rotation',
         "RotationTrack1440min_00.50": 'rotation',
         "RotationTrack120min_00.50": 'rotation',
+        "MergedAzShear_0-2kmAGL_00.50": 'rotation',
+        "MergedAzShear_3-6kmAGL_00.50": 'rotation',
 
         "MESH_Max_60min_00.50": 'hail',
         "MESH_Max_360min_00.50": 'hail',

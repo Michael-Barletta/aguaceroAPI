@@ -1,5 +1,40 @@
 
 export const DEFAULT_COLORMAPS = {
+    "ptypeRefl": {
+        "type": "fill",
+        "gridded": false,
+        "interpolationType": "interpolate",
+        "units": {
+          "dBZ": {
+            "colormap": [
+              // --- Rain Palette (Standard Reflectivity Values: 5 to 80) ---
+              5, "#00cc66",
+              35, "#ffff00",
+              70, "#ff8800",
+              80, "#ff0000",
+
+              // --- Snow Palette (Reflectivity Values Offset by +100) ---
+              105, "#33ccff",
+              135, "#8800cc",
+              170, "#ffccff",
+              180, "#dddddd",
+
+              // --- Freezing Rain Palette (Reflectivity Values Offset by +200) ---
+              205, "#ff3300",
+              230, "#ffaa33",
+              280, "#cc0066"
+            ],
+            "breakpoints": [
+                // Rain Breakpoints
+                5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80,
+                // Snow Breakpoints
+                105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155, 160, 165, 170, 175, 180,
+                // Freezing Rain Breakpoints
+                205, 210, 215, 220, 225, 230, 235, 240, 245, 250, 255, 260, 265, 270, 275, 280
+            ]
+          }
+        }
+      },
     "MergedZdr_04.00" : {
         type: "fill",
         gridded: false,
@@ -115,6 +150,26 @@ export const DEFAULT_COLORMAPS = {
                 ],
                 breakpoints : [
                     0, 1, 2, 4, 6, 8, 10, 15, 20, 30, 40, 50, 75, 100
+                ],
+            },
+            'in' : {
+                colormap : [
+                    0, "#00ffff",
+                    0.05, "#00ffff",      // 1mm
+                    0.1, "#0099ff",      // 2mm
+                    0.2, "#0066ff",      // 4mm
+                    0.3, "#00ff00",      // 6mm
+                    0.5, "#00ff00",      // 10mm
+                    0.6, "#ffff00",      // 15mm
+                    0.8, "#ffcc00",      // 20mm
+                    1, "#ff9900",      // 30mm
+                    1.5, "#ff0000",      // 40mm
+                    2, "#ff0000",      // 50mm
+                    3, "#ff00ff",      // 75mm
+                    4, "#8000ff",      // 100mm
+                ],
+                breakpoints : [
+                    0, 0.05,  .1, .2, .3, .5, .6, .8, 1, 1.5, 2, 3, 4
                 ],
             },
         },

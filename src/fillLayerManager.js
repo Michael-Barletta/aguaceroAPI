@@ -63,6 +63,8 @@ export class FillLayerManager extends EventEmitter {
         this.playIntervalId = null;
         this.playbackSpeed = options.playbackSpeed || 500;
         this.customColormaps = options.customColormaps || {};
+        this._handleMouseMove = this._handleMouseMove.bind(this);
+        this.map.on('mousemove', this._handleMouseMove);
         
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || null;
@@ -375,6 +377,7 @@ export class FillLayerManager extends EventEmitter {
         this.dataCache.clear();
         this.worker.terminate();
         this.callbacks = {};
+        this.map.off('mousemove', this._handleMouseMove);
         console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
     }
 
@@ -485,9 +488,21 @@ export class FillLayerManager extends EventEmitter {
         
         const latestRun = findLatestModelRun(this.modelStatus, this.state.model);
         let initialState = this.state;
+
         if (latestRun && !this.state.isMRMS) {
             initialState = { ...this.state, ...latestRun, forecastHour: 0 };
+
+            // --- VVVV ADD THIS BLOCK TO SELECT A DEFAULT VARIABLE VVVV ---
+            // Get the list of available variables for the initialized model.
+            const availableVariables = this.getAvailableVariables(initialState.model);
+            
+            // If variables exist, set the first one as the active variable.
+            if (availableVariables && availableVariables.length > 0) {
+                initialState.variable = availableVariables[0];
+            }
+            // --- ^^^^ END OF ADDED BLOCK ^^^^
         }
+
         await this.setState(initialState);
         if (options.autoRefresh ?? this.autoRefreshEnabled) {
             this.startAutoRefresh(options.refreshInterval ?? this.autoRefreshIntervalSeconds);
@@ -754,5 +769,154 @@ export class FillLayerManager extends EventEmitter {
             clearInterval(this.autoRefreshIntervalId);
             this.autoRefreshIntervalId = null;
         }
+    }
+
+/**
+     * Handles the map's mousemove event to inspect data values under the cursor.
+     * @param {object} e - The Mapbox GL mouse event object.
+     * @private
+     */
+    async _handleMouseMove(e) {
+        const { lng, lat } = e.lngLat;
+        const { variable, isMRMS, mrmsTimestamp, model, date, run, forecastHour, units } = this.state;
+
+        if (!variable) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        const gridIndices = this._getGridIndexFromLngLat(lng, lat);
+        if (!gridIndices) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        const { i, j } = gridIndices;
+        const gridModel = isMRMS ? 'mrms' : model;
+        const { nx } = COORDINATE_CONFIGS[gridModel].grid_params;
+        const customSettings = this.customColormaps[variable];
+        const effectiveSmoothing = (customSettings && typeof customSettings.smoothing === 'number') ? customSettings.smoothing : 0;
+        
+        const dataUrlIdentifier = isMRMS
+            ? `mrms-${mrmsTimestamp}-${variable}-${effectiveSmoothing}`
+            : `${model}-${date}-${run}-${forecastHour}-${variable}-${effectiveSmoothing}`;
+
+        const gridDataPromise = this.dataCache.get(dataUrlIdentifier);
+        if (!gridDataPromise) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        try {
+            const gridData = await gridDataPromise;
+            if (!gridData || !gridData.data) {
+                this.emit('data:inspect', null);
+                return;
+            }
+
+            // --- START OF FINAL FIX ---
+
+            // 1. Get the colormap currently being used for rendering. This is the true source of the data range.
+            const { colormap, baseUnit } = this._getColormapForVariable(variable);
+
+            // 2. If there's no colormap, we cannot determine the data range.
+            if (!colormap || colormap.length < 2) {
+                this.emit('data:inspect', null);
+                return;
+            }
+
+            // 3. Extract the min and max values directly from the colormap array.
+            const min = colormap[0];
+            const max = colormap[colormap.length - 2];
+
+            // 4. Look up the raw byte value and un-scale it using the colormap's range.
+            const index1D = j * nx + i;
+            const byteValue = gridData.data[index1D];
+            const nativeValue = min + (byteValue / 255.0) * (max - min);
+
+            // 5. Use the unit defined in the colormap for consistency.
+            let dataNativeUnit = baseUnit;
+            if (!dataNativeUnit || dataNativeUnit === 'none') {
+                 // Provide a fallback for common variables like reflectivity if unit is missing.
+                if (variable.toLowerCase().includes('ref')) {
+                    dataNativeUnit = 'dBZ';
+                } else {
+                    dataNativeUnit = 'none';
+                }
+            }
+            
+            // --- END OF FINAL FIX ---
+
+            const displayUnit = this._getTargetUnit(dataNativeUnit, units);
+            const conversionFunc = getUnitConversionFunction(dataNativeUnit, displayUnit);
+            const displayValue = conversionFunc ? conversionFunc(nativeValue) : nativeValue;
+
+            this.emit('data:inspect', {
+                lngLat: e.lngLat,
+                point: e.point,
+                variable: {
+                    code: variable,
+                    name: this.getVariableDisplayName(variable),
+                },
+                value: displayValue,
+                unit: displayUnit,
+            });
+
+        } catch (error) {
+            this.emit('data:inspect', null);
+        }
+    }
+
+/**
+     * Converts geographic coordinates (lng/lat) to grid indices (i, j).
+     * @param {number} lng - The longitude.
+     * @param {number} lat - The latitude.
+     * @returns {object|null} An object {i, j} or null if out of bounds.
+     * @private
+     */
+    _getGridIndexFromLngLat(lng, lat) {
+        const gridModel = this.state.isMRMS ? 'mrms' : this.state.model;
+        const gridDef = COORDINATE_CONFIGS[gridModel];
+        if (!gridDef) return null;
+
+        const { nx, ny } = gridDef.grid_params;
+        let i, j;
+
+        if (gridDef.type === 'latlon') {
+            const { lon_first, lat_first, dx_degrees, dy_degrees } = gridDef.grid_params;
+
+            // --- THIS IS THE FIX for GFS ---
+            // 1. Normalize the mouse longitude from [-180, 180] to the grid's [0, 360] range.
+            let normalizedLng = lng;
+            if (normalizedLng < lon_first) {
+                normalizedLng += 360;
+            }
+
+            // 2. Calculate indices using the normalized longitude.
+            // The latitude calculation is correct because dy_degrees is negative,
+            // naturally handling the grid's top-to-bottom orientation.
+            i = Math.round((normalizedLng - lon_first) / dx_degrees);
+            j = Math.round((lat - lat_first) / dy_degrees);
+            // --- END OF FIX ---
+
+        } else if (gridDef.type === 'lambert_conformal_conic' || gridDef.type === 'polar_stereographic') {
+            // (Leaving other projection logic as is)
+            let projString = Object.entries(gridDef.proj_params).map(([k,v]) => `+${k}=${v}`).join(' ');
+            if(gridDef.type === 'polar_stereographic') projString += ' +lat_0=90';
+            
+            const [proj_x, proj_y] = proj4('EPSG:4326', projString, [lng, lat]);
+            const { x_origin, y_origin, dx, dy } = gridDef.grid_params;
+            i = Math.round((proj_x - x_origin) / dx);
+            j = Math.round((proj_y - y_origin) / dy);
+        } else {
+            return null; // Other projections are not supported for inspection.
+        }
+
+        // Final check to ensure the calculated indices are within the grid's bounds.
+        if (i >= 0 && i < nx && j >= 0 && j < ny) {
+            return { i, j };
+        }
+        
+        return null;
     }
 }

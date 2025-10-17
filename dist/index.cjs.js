@@ -1498,7 +1498,10 @@ const MODEL_CONFIGS = {
             "VIL_Max_120min_00.50",
             "VIL_Density_00.50",
             "VIL_00.50",
-            "LVL3_HighResVIL_00.50"
+            "LVL3_HighResVIL_00.50",
+            "ptypeRefl", 
+            "MergedAzShear_0-2kmAGL_00.50",
+            "MergedAzShear_3-6kmAGL_00.50",
         ],
         name: 'MRMS',
     },
@@ -1580,7 +1583,7 @@ const MODEL_CONFIGS = {
     'hrrr': {
         bounds: [-134.09547, 21.13812300, -60.91719, 52.6156533],
         max_zoom: 7,
-        vars: ['refd_1000', 'vis_0', 'mxrefc_1000', 'gust_runmax', 'skewt', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12',  'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0',  'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'ltng_0', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'w_850', 'cape_0-3000', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'w_700', 'tts', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   'tehi', '2t_2', 'mxuphl_5000', 'mxuphl_5000_runmax', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
+        vars: ['hail', 'refd_1000', 'vis_0', 'mxrefc_1000', 'gust_runmax', 'skewt', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12',  'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0',  'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'ltng_0', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'w_850', 'cape_0-3000', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'w_700', 'tts', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   'tehi', '2t_2', 'mxuphl_5000', 'mxuphl_5000_runmax', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
         category: 'Mesoscale',
         name: 'HRRR',
         pressureLvls: [100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500,525,550,575,600,625,650,675,700,725,750,775,800,825,850,875,900,925,950,975,1000],
@@ -1683,7 +1686,7 @@ const MODEL_CONFIGS = {
     'rrfs': {
         bounds: [-134.09547, 21.13812300, -60.91719, 52.6156533],
         max_zoom: 7,
-        vars: ['vis_0', 'gust_runmax', 'tts', 'tehi', 'cape_0-3000', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12', 'crain_24', 'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cicep_24', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'cfrzr_24', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'csnow_24', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'tp_24', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0', 'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   '2t_2', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
+        vars: ['hail', 'vis_0', 'gust_runmax', 'tts', 'tehi', 'cape_0-3000', 'slr', 'bulk_shear_speedmb_500', 'bulk_shear_speedmb_700', 'bulk_shear_speedmb_850', 'bulk_shear_speedmb_925','2t_2iso0','crain_total', 'crain_1', 'crain_3', 'crain_6', 'crain_12', 'crain_24', 'cicep_total', 'cicep_1', 'cicep_3', 'cicep_6', 'cicep_12', 'cicep_24', 'cfrzr_total', 'cfrzr_1', 'cfrzr_3', 'cfrzr_6', 'cfrzr_12', 'cfrzr_24', 'csnow_total', 'csnow_1', 'csnow_3', 'csnow_6', 'csnow_12', 'csnow_24', 'tp_0_total', 'tp_0_1', 'tp_3', 'tp_6', 'tp_12', 'tp_24', 'bulk_shear_speed_0-6000', 'gh_500', 'irsat', 'lcl', 'stp', 't_850', 't_850iso0', 'cape_0', 'gh_700', 'gh_925', 'supercellComposite',  'lcc_0', 'lftx_500', 'mslma_0', 'thetaE',  'hcc_0', 't_700', 't_700iso0', 'atemp',   'wind_speed_925', 't_925', 't_925iso0', 'crain', 'csnow', 'cicep', 'cfrzr', 'wind_speed_700', 'refc_0',   '2t_2', 'mxuphl_3000', 'mxuphl_3000_runmax', 'wind_speed_500', 'wind_speed_850', 'tcc_0', 'cin_0', 'ehi_3000', 'mcc_0',  'cin_25500', 'gh_850', 'vo_10', '2r_2', 'tadv_700', 'moistureConvergence', 'hlcy_3000', 'lapse_rates_500700', 'gust_0', 'rainRefl', 'icepRefl', 'snowRefl', 'frzrRefl',  'hlcy_1000', 'pwat_0',  'cin_9000', 'cape_9000', 'ehi_1000', 'wind_speed_10', '2d_2', 'cape_25500', 'thickness', 'tadv_850', 'bulk_shear_speed_0-1000'],
         category: 'Mesoscale',
         name: 'RRFS A',
         skewt: true,
@@ -4950,6 +4953,34 @@ const DICTIONARIES = {
             
             description: '',
         },
+        "MergedAzShear_0-2kmAGL_00.50": {
+            category: "Rotation",
+            variable: "Rotation Track (Instant)",
+            shortname: "Low-level Rotation",
+            units: {
+                "s⁻¹": {
+                    min: .003,
+                    max: .02,
+                    intervals: [0.001],
+                },
+            },
+            
+            description: '',
+        },
+        "MergedAzShear_3-6kmAGL_00.50": {
+            category: "Rotation",
+            variable: "ML Rotation Track (Instant)",
+            shortname: "Mid-level Rotation",
+            units: {
+                "s⁻¹": {
+                    min: .003,
+                    max: .02,
+                    intervals: [0.001],
+                },
+            },
+            
+            description: '',
+        },
         "RotationTrackML30min_00.50": {
             category: "Rotation",
             variable: "ML Rotation Track (30 min)",
@@ -5118,6 +5149,20 @@ const DICTIONARIES = {
             
             description: '',
         },
+        "ptypeRefl": {
+            category: "Composite Reflectivity",
+            variable: "Precipitation Type Reflectivity",
+            shortname: "Precip. Type Refl.",
+            units: {
+                "dBZ": {
+                    min: 5,
+                    max: 280,
+                    intervals: [1],
+                },
+            },
+            
+            description: '',
+        },
         "MESH_Max_30min_00.50": {
             category: "Hail",
             variable: "Max Hail Size (30 min)",
@@ -5128,8 +5173,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_60min_00.50": {
@@ -5142,8 +5192,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_120min_00.50": {
@@ -5156,8 +5211,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_240min_00.50": {
@@ -5170,8 +5230,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_360min_00.50": {
@@ -5184,8 +5249,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_Max_1440min_00.50": {
@@ -5198,8 +5268,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "MESH_00.50": {
@@ -5212,8 +5287,13 @@ const DICTIONARIES = {
                     max: 100,
                     intervals: [5],
                 },
+                "in": {
+                    min: 0.01,
+                    max: 10,
+                    intervals: [5],
+                },
             },
-            
+            defaultUnit: 'mm',
             description: '',
         },
         "FLASH_QPE_ARIMAX_00.00": {
@@ -5402,6 +5482,8 @@ const DICTIONARIES = {
         "RotationTrack240min_00.50": 'rotation',
         "RotationTrack1440min_00.50": 'rotation',
         "RotationTrack120min_00.50": 'rotation',
+        "MergedAzShear_0-2kmAGL_00.50": 'rotation',
+        "MergedAzShear_3-6kmAGL_00.50": 'rotation',
 
         "MESH_Max_60min_00.50": 'hail',
         "MESH_Max_360min_00.50": 'hail',
@@ -5557,6 +5639,41 @@ const DICTIONARIES = {
 };
 
 const DEFAULT_COLORMAPS = {
+    "ptypeRefl": {
+        "type": "fill",
+        "gridded": false,
+        "interpolationType": "interpolate",
+        "units": {
+          "dBZ": {
+            "colormap": [
+              // --- Rain Palette (Standard Reflectivity Values: 5 to 80) ---
+              5, "#00cc66",
+              35, "#ffff00",
+              70, "#ff8800",
+              80, "#ff0000",
+
+              // --- Snow Palette (Reflectivity Values Offset by +100) ---
+              105, "#33ccff",
+              135, "#8800cc",
+              170, "#ffccff",
+              180, "#dddddd",
+
+              // --- Freezing Rain Palette (Reflectivity Values Offset by +200) ---
+              205, "#ff3300",
+              230, "#ffaa33",
+              280, "#cc0066"
+            ],
+            "breakpoints": [
+                // Rain Breakpoints
+                5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80,
+                // Snow Breakpoints
+                105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155, 160, 165, 170, 175, 180,
+                // Freezing Rain Breakpoints
+                205, 210, 215, 220, 225, 230, 235, 240, 245, 250, 255, 260, 265, 270, 275, 280
+            ]
+          }
+        }
+      },
     "MergedZdr_04.00" : {
         type: "fill",
         gridded: false,
@@ -5672,6 +5789,26 @@ const DEFAULT_COLORMAPS = {
                 ],
                 breakpoints : [
                     0, 1, 2, 4, 6, 8, 10, 15, 20, 30, 40, 50, 75, 100
+                ],
+            },
+            'in' : {
+                colormap : [
+                    0, "#00ffff",
+                    0.05, "#00ffff",      // 1mm
+                    0.1, "#0099ff",      // 2mm
+                    0.2, "#0066ff",      // 4mm
+                    0.3, "#00ff00",      // 6mm
+                    0.5, "#00ff00",      // 10mm
+                    0.6, "#ffff00",      // 15mm
+                    0.8, "#ffcc00",      // 20mm
+                    1, "#ff9900",      // 30mm
+                    1.5, "#ff0000",      // 40mm
+                    2, "#ff0000",      // 50mm
+                    3, "#ff00ff",      // 75mm
+                    4, "#8000ff",      // 100mm
+                ],
+                breakpoints : [
+                    0, 0.05,  .1, .2, .3, .5, .6, .8, 1, 1.5, 2, 3, 4
                 ],
             },
         },
@@ -8469,6 +8606,8 @@ class FillLayerManager extends EventEmitter {
         this.playIntervalId = null;
         this.playbackSpeed = options.playbackSpeed || 500;
         this.customColormaps = options.customColormaps || {};
+        this._handleMouseMove = this._handleMouseMove.bind(this);
+        this.map.on('mousemove', this._handleMouseMove);
         
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || null;
@@ -8781,6 +8920,7 @@ class FillLayerManager extends EventEmitter {
         this.dataCache.clear();
         this.worker.terminate();
         this.callbacks = {};
+        this.map.off('mousemove', this._handleMouseMove);
         console.log(`FillLayerManager with id "${this.layerId}" has been destroyed.`);
     }
 
@@ -8891,9 +9031,21 @@ class FillLayerManager extends EventEmitter {
         
         const latestRun = findLatestModelRun(this.modelStatus, this.state.model);
         let initialState = this.state;
+
         if (latestRun && !this.state.isMRMS) {
             initialState = { ...this.state, ...latestRun, forecastHour: 0 };
+
+            // --- VVVV ADD THIS BLOCK TO SELECT A DEFAULT VARIABLE VVVV ---
+            // Get the list of available variables for the initialized model.
+            const availableVariables = this.getAvailableVariables(initialState.model);
+            
+            // If variables exist, set the first one as the active variable.
+            if (availableVariables && availableVariables.length > 0) {
+                initialState.variable = availableVariables[0];
+            }
+            // --- ^^^^ END OF ADDED BLOCK ^^^^
         }
+
         await this.setState(initialState);
         if (options.autoRefresh ?? this.autoRefreshEnabled) {
             this.startAutoRefresh(options.refreshInterval ?? this.autoRefreshIntervalSeconds);
@@ -9160,6 +9312,155 @@ class FillLayerManager extends EventEmitter {
             clearInterval(this.autoRefreshIntervalId);
             this.autoRefreshIntervalId = null;
         }
+    }
+
+/**
+     * Handles the map's mousemove event to inspect data values under the cursor.
+     * @param {object} e - The Mapbox GL mouse event object.
+     * @private
+     */
+    async _handleMouseMove(e) {
+        const { lng, lat } = e.lngLat;
+        const { variable, isMRMS, mrmsTimestamp, model, date, run, forecastHour, units } = this.state;
+
+        if (!variable) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        const gridIndices = this._getGridIndexFromLngLat(lng, lat);
+        if (!gridIndices) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        const { i, j } = gridIndices;
+        const gridModel = isMRMS ? 'mrms' : model;
+        const { nx } = COORDINATE_CONFIGS[gridModel].grid_params;
+        const customSettings = this.customColormaps[variable];
+        const effectiveSmoothing = (customSettings && typeof customSettings.smoothing === 'number') ? customSettings.smoothing : 0;
+        
+        const dataUrlIdentifier = isMRMS
+            ? `mrms-${mrmsTimestamp}-${variable}-${effectiveSmoothing}`
+            : `${model}-${date}-${run}-${forecastHour}-${variable}-${effectiveSmoothing}`;
+
+        const gridDataPromise = this.dataCache.get(dataUrlIdentifier);
+        if (!gridDataPromise) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        try {
+            const gridData = await gridDataPromise;
+            if (!gridData || !gridData.data) {
+                this.emit('data:inspect', null);
+                return;
+            }
+
+            // --- START OF FINAL FIX ---
+
+            // 1. Get the colormap currently being used for rendering. This is the true source of the data range.
+            const { colormap, baseUnit } = this._getColormapForVariable(variable);
+
+            // 2. If there's no colormap, we cannot determine the data range.
+            if (!colormap || colormap.length < 2) {
+                this.emit('data:inspect', null);
+                return;
+            }
+
+            // 3. Extract the min and max values directly from the colormap array.
+            const min = colormap[0];
+            const max = colormap[colormap.length - 2];
+
+            // 4. Look up the raw byte value and un-scale it using the colormap's range.
+            const index1D = j * nx + i;
+            const byteValue = gridData.data[index1D];
+            const nativeValue = min + (byteValue / 255.0) * (max - min);
+
+            // 5. Use the unit defined in the colormap for consistency.
+            let dataNativeUnit = baseUnit;
+            if (!dataNativeUnit || dataNativeUnit === 'none') {
+                 // Provide a fallback for common variables like reflectivity if unit is missing.
+                if (variable.toLowerCase().includes('ref')) {
+                    dataNativeUnit = 'dBZ';
+                } else {
+                    dataNativeUnit = 'none';
+                }
+            }
+            
+            // --- END OF FINAL FIX ---
+
+            const displayUnit = this._getTargetUnit(dataNativeUnit, units);
+            const conversionFunc = getUnitConversionFunction(dataNativeUnit, displayUnit);
+            const displayValue = conversionFunc ? conversionFunc(nativeValue) : nativeValue;
+
+            this.emit('data:inspect', {
+                lngLat: e.lngLat,
+                point: e.point,
+                variable: {
+                    code: variable,
+                    name: this.getVariableDisplayName(variable),
+                },
+                value: displayValue,
+                unit: displayUnit,
+            });
+
+        } catch (error) {
+            this.emit('data:inspect', null);
+        }
+    }
+
+/**
+     * Converts geographic coordinates (lng/lat) to grid indices (i, j).
+     * @param {number} lng - The longitude.
+     * @param {number} lat - The latitude.
+     * @returns {object|null} An object {i, j} or null if out of bounds.
+     * @private
+     */
+    _getGridIndexFromLngLat(lng, lat) {
+        const gridModel = this.state.isMRMS ? 'mrms' : this.state.model;
+        const gridDef = COORDINATE_CONFIGS[gridModel];
+        if (!gridDef) return null;
+
+        const { nx, ny } = gridDef.grid_params;
+        let i, j;
+
+        if (gridDef.type === 'latlon') {
+            const { lon_first, lat_first, dx_degrees, dy_degrees } = gridDef.grid_params;
+
+            // --- THIS IS THE FIX for GFS ---
+            // 1. Normalize the mouse longitude from [-180, 180] to the grid's [0, 360] range.
+            let normalizedLng = lng;
+            if (normalizedLng < lon_first) {
+                normalizedLng += 360;
+            }
+
+            // 2. Calculate indices using the normalized longitude.
+            // The latitude calculation is correct because dy_degrees is negative,
+            // naturally handling the grid's top-to-bottom orientation.
+            i = Math.round((normalizedLng - lon_first) / dx_degrees);
+            j = Math.round((lat - lat_first) / dy_degrees);
+            // --- END OF FIX ---
+
+        } else if (gridDef.type === 'lambert_conformal_conic' || gridDef.type === 'polar_stereographic') {
+            // (Leaving other projection logic as is)
+            let projString = Object.entries(gridDef.proj_params).map(([k,v]) => `+${k}=${v}`).join(' ');
+            if(gridDef.type === 'polar_stereographic') projString += ' +lat_0=90';
+            
+            const [proj_x, proj_y] = proj4('EPSG:4326', projString, [lng, lat]);
+            const { x_origin, y_origin, dx, dy } = gridDef.grid_params;
+            i = Math.round((proj_x - x_origin) / dx);
+            j = Math.round((proj_y - y_origin) / dy);
+        } else {
+            return null; // Other projections are not supported for inspection.
+        }
+
+        // Final check to ensure the calculated indices are within the grid's bounds.
+        if (i >= 0 && i < nx && j >= 0 && j < ny) {
+            return { i, j };
+        }
+        
+        return null;
     }
 }
 
