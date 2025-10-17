@@ -8732,30 +8732,30 @@ class FillLayerManager extends EventEmitter {
             this.map.removeLayer(this.shaderLayer.id);
             this.shaderLayer = null;
         }
-        // The line "this.dataCache.clear();" has been removed from here
-        // to preserve the cache when toggling layers or changing modes.
         this.currentLoadedTimeKey = null;
         if (!state.variable) return;
 
         // 2. Set up the new layer's visual style
         this.shaderLayer = new GridRenderLayer(this.layerId);
 
-        // VVVV --- ADD THIS BLOCK --- VVVV
         // Ensure the smoothing state is correctly applied to the new layer instance.
         if (typeof this.shaderLayer.setSmoothing === 'function') {
             // The shader's method expects a 'noSmoothing' flag, so we invert our boolean state.
             this.shaderLayer.setSmoothing(!state.shaderSmoothingEnabled);
         }
-        // ^^^^ --- END OF ADDED BLOCK --- ^^^^
 
         this.map.addLayer(this.shaderLayer, 'AML_-_terrain');
         this._updateLayerStyle(state);
 
-        // 3. CRITICAL: Initiate the load for the visible frame.
-        this._updateLayerData(state); 
+        // 3. CRITICAL CHANGE: Await the load for the visible frame.
+        // This ensures the first frame is fully loaded and sent to the GPU
+        // before we proceed to preloading other frames. This guarantees
+        // immediate visualization as soon as the data is available.
+        await this._updateLayerData(state);
         
-        // 4. CRITICAL: Immediately initiate the preload for all other frames.
-        this._preloadAllTimeSteps(state); 
+        // 4. Now that the main frame is visible, initiate the preload for all
+        // other frames in the background. This runs concurrently without blocking.
+        this._preloadAllTimeSteps(state);
     }
     
     _preloadAllTimeSteps(state) {
