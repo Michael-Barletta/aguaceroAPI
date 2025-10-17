@@ -5463,6 +5463,77 @@ const DICTIONARIES = {
             description: '',
         },
     },
+    smoothing: {
+        'hires': {
+            'tadv_300': 2,
+            'tadv_700': 2,
+            'tadv_850': 2,
+            'w_500': 2,
+            'w_700': 2,
+            'w_850': 2,
+            'w_925': 2,
+            'vo_500': 4,
+            'vo_700': 4,
+            'vo_850': 4,
+            'vo_10': 4,
+            'fgen_700': 7,
+            'fgen_850': 7,
+            'divergence_200': 7,
+            'divergence_850': 7,
+        },
+        'medres': {
+            'tadv_300': 3,
+            'divergence_200': 7,
+            'divergence_850': 7,
+        },
+        'lowres': {
+            'tadv_300': 3,
+            'divergence_200': 7,
+            'divergence_850': 7,
+        },
+    },
+    model_type: {
+        'arome1': 'hires',
+        'arome25': 'hires',
+        'arpegeeu': 'hires',
+        'arw': 'hires',
+        'arw2': 'hires',
+        'fv3': 'hires',
+        'hrdps': 'hires',
+        'href': 'hires',
+        'hrrr': 'hires',
+        'hrrrsub':'hires',
+        'icond2': 'hires',
+        'iconeu': 'hires',
+        'mpashn': 'hires',
+        'mpasht': 'hires',
+        'mpasrt': 'hires',
+        'mpasrn': 'hires',
+        'mpasrn3': 'hires',
+        'mpasht2': 'hires',
+        'namnest': 'hires',
+        'nbm': 'hires',
+        'rrfs': 'hires',
+        'hwrf': 'hires',
+        'hmon': 'hires',
+        'hfsb': 'hires',
+        'hfsa': 'hires',
+
+        'ecmwf': 'lowres',
+        'ecmwfaifs': 'lowres',
+        'gefs': 'lowres',
+        'gem': 'lowres',
+        'gfs': 'lowres',
+        'graphcastgfs': 'lowres',
+        'arpege': 'lowres',
+
+        'nam': 'medres',
+        'rap': 'medres',
+        'rgem': 'medres',
+        
+        'rtma': 'hires', 
+        'mrms': 'hires',
+    },
     variable_cmap: {
         //mrms
         'MergedReflectivityQCComposite_00.50': 'refc_0',
@@ -9386,7 +9457,7 @@ class FillLayerManager extends EventEmitter {
      * @param {object} e - The Mapbox GL mouse event object.
      * @private
      */
-    async _handleMouseMove(e) {
+async _handleMouseMove(e) {
         const { lng, lat } = e.lngLat;
         const { variable, isMRMS, mrmsTimestamp, model, date, run, forecastHour, units } = this.state;
 
@@ -9404,6 +9475,101 @@ class FillLayerManager extends EventEmitter {
         const { i, j } = gridIndices;
         const gridModel = isMRMS ? 'mrms' : model;
         const { nx } = COORDINATE_CONFIGS[gridModel].grid_params;
+
+        // VVVV --- THIS IS THE FIX --- VVVV
+        // Corrected the typo from "customColomaps" to "customColormaps"
+        const customSettings = this.customColormaps[variable];
+        // ^^^^ --- END OF FIX --- ^^^^
+
+        const effectiveSmoothing = (customSettings && typeof customSettings.smoothing === 'number') ? customSettings.smoothing : 0;
+        
+        const dataUrlIdentifier = isMRMS
+            ? `mrms-${mrmsTimestamp}-${variable}-${effectiveSmoothing}`
+            : `${model}-${date}-${run}-${forecastHour}-${variable}-${effectiveSmoothing}`;
+
+        const gridDataPromise = this.dataCache.get(dataUrlIdentifier);
+        if (!gridDataPromise) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        try {
+            const gridData = await gridDataPromise;
+            if (!gridData || !gridData.data) {
+                this.emit('data:inspect', null);
+                return;
+            }
+
+            // Get the raw byte value (0-255) that was sent to the texture.
+            const index1D = j * nx + i;
+            const byteValue = gridData.data[index1D];
+
+            // Reverse the texture transformation (value + 128) to get the original signed quantized value.
+            const signedQuantizedValue = byteValue - 128;
+
+            // Get the precise scale and offset from the data's encoding metadata.
+            const { scale, offset, missing_quantized } = gridData.encoding;
+
+            // Check if the value is the designated "missing" value.
+            if (signedQuantizedValue === missing_quantized) {
+                this.emit('data:inspect', null);
+                return;
+            }
+
+            // Dequantize to get the true, unscaled physical value.
+            const nativeValue = signedQuantizedValue * scale + offset;
+
+            // Get the base unit from the variable's dictionary or colormap.
+            const { baseUnit } = this._getColormapForVariable(variable);
+            let dataNativeUnit = baseUnit || (DICTIONARIES.fld[variable] || {}).defaultUnit || 'none';
+            
+            const displayUnit = this._getTargetUnit(dataNativeUnit, units);
+            const conversionFunc = getUnitConversionFunction(dataNativeUnit, displayUnit);
+            const displayValue = conversionFunc ? conversionFunc(nativeValue) : nativeValue;
+
+            this.emit('data:inspect', {
+                lngLat: e.lngLat,
+                point: e.point,
+                variable: {
+                    code: variable,
+                    name: this.getVariableDisplayName(variable),
+                },
+                value: displayValue,
+                unit: displayUnit,
+            });
+
+        } catch (error) {
+            this.emit('data:inspect', null);
+        }
+    }
+// (Keep all of your existing code from the top of the file down to _handleMouseMove)
+// ...
+
+   /**
+     * Handles the map's mousemove event to inspect data values under the cursor.
+     * @param {object} e - The Mapbox GL mouse event object.
+     * @private
+     */
+    async _handleMouseMove(e) {
+        // ... (this function remains unchanged)
+        const { lng, lat } = e.lngLat;
+        const { variable, isMRMS, mrmsTimestamp, model, date, run, forecastHour, units } = this.state;
+
+        if (!variable) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        const gridIndices = this._getGridIndexFromLngLat(lng, lat);
+        if (!gridIndices) {
+            this.emit('data:inspect', null);
+            return;
+        }
+
+        const { i, j } = gridIndices;
+        const gridModel = isMRMS ? 'mrms' : model;
+        const { nx } = COORDINATE_CONFIGS[gridModel].grid_params;
+
         const customSettings = this.customColormaps[variable];
         const effectiveSmoothing = (customSettings && typeof customSettings.smoothing === 'number') ? customSettings.smoothing : 0;
         
@@ -9424,39 +9590,20 @@ class FillLayerManager extends EventEmitter {
                 return;
             }
 
-            // --- START OF FINAL FIX ---
+            const index1D = j * nx + i;
+            const byteValue = gridData.data[index1D];
+            const signedQuantizedValue = byteValue - 128;
+            const { scale, offset, missing_quantized } = gridData.encoding;
 
-            // 1. Get the colormap currently being used for rendering. This is the true source of the data range.
-            const { colormap, baseUnit } = this._getColormapForVariable(variable);
-
-            // 2. If there's no colormap, we cannot determine the data range.
-            if (!colormap || colormap.length < 2) {
+            if (signedQuantizedValue === missing_quantized) {
                 this.emit('data:inspect', null);
                 return;
             }
 
-            // 3. Extract the min and max values directly from the colormap array.
-            const min = colormap[0];
-            const max = colormap[colormap.length - 2];
-
-            // 4. Look up the raw byte value and un-scale it using the colormap's range.
-            const index1D = j * nx + i;
-            const byteValue = gridData.data[index1D];
-            const nativeValue = min + (byteValue / 255.0) * (max - min);
-
-            // 5. Use the unit defined in the colormap for consistency.
-            let dataNativeUnit = baseUnit;
-            if (!dataNativeUnit || dataNativeUnit === 'none') {
-                 // Provide a fallback for common variables like reflectivity if unit is missing.
-                if (variable.toLowerCase().includes('ref')) {
-                    dataNativeUnit = 'dBZ';
-                } else {
-                    dataNativeUnit = 'none';
-                }
-            }
+            const nativeValue = signedQuantizedValue * scale + offset;
+            const { baseUnit } = this._getColormapForVariable(variable);
+            let dataNativeUnit = baseUnit || (DICTIONARIES.fld[variable] || {}).defaultUnit || 'none';
             
-            // --- END OF FINAL FIX ---
-
             const displayUnit = this._getTargetUnit(dataNativeUnit, units);
             const conversionFunc = getUnitConversionFunction(dataNativeUnit, displayUnit);
             const displayValue = conversionFunc ? conversionFunc(nativeValue) : nativeValue;
@@ -9477,56 +9624,167 @@ class FillLayerManager extends EventEmitter {
         }
     }
 
-/**
-     * Converts geographic coordinates (lng/lat) to grid indices (i, j).
-     * @param {number} lng - The longitude.
-     * @param {number} lat - The latitude.
-     * @returns {object|null} An object {i, j} or null if out of bounds.
-     * @private
-     */
+    // --- MODIFIED FUNCTIONS START HERE ---
+
+    latLonToProjected(lat, lon, gridDef) {
+        if (!isFinite(lat) || !isFinite(lon)) {
+            throw new Error(`Invalid coordinates: lat=${lat}, lon=${lon}`);
+        }
+        
+        const gridType = gridDef.type;
+
+        if (gridType === 'latlon') {
+            return { x: lon, y: lat };
+        } 
+        
+        // For projected systems, we need to create the projection converter on the fly
+        let projString = Object.entries(gridDef.proj_params).map(([k,v]) => `+${k}=${v}`).join(' ');
+        if(gridType === 'polar_stereographic') {
+            projString += ' +lat_0=90';
+        }
+        
+        const projected = proj4('EPSG:4326', projString, [lon, lat]);
+        return { x: projected[0], y: projected[1] };
+    }
+    
+    latLonToGridPixel(lat, lon, gridDef, modelName) {
+        if (!gridDef) return null; // Guard against missing grid definition
+
+        if (modelName === 'rgem' && gridDef.type === 'polar_stereographic') {
+            return this.latLonToGridPixelPolarStereographic(lat, lon, gridDef);
+        }
+        
+        const projected = this.latLonToProjected(lat, lon, gridDef);
+        
+        let x, y;
+
+        // Pre-calculate grid origin and pixel size from the definition
+        const gridOrigin = { x: gridDef.grid_params.lon_first, y: gridDef.grid_params.lat_first };
+        const gridPixelSize = { x: gridDef.grid_params.dx_degrees, y: gridDef.grid_params.dy_degrees };
+        
+        if (gridDef.type === 'latlon' || gridDef.type === 'rotated_latlon') {
+            let adjustedLon = projected.x;
+            
+            if (modelName === 'mrms') {
+                if (adjustedLon < 0) adjustedLon += 360;
+                x = (adjustedLon - gridOrigin.x) / gridPixelSize.x;
+                y = (gridOrigin.y - projected.y) / gridPixelSize.y;
+            } else {
+                const isGFSType = gridDef.grid_params && gridDef.grid_params.lon_first === 0.0 && Math.abs(gridDef.grid_params.lat_first) === 90.0;
+                const isECMWFType = gridDef.grid_params && gridDef.grid_params.lon_first === 180.0 && gridDef.grid_params.lat_first === 90.0;
+                const isGEMType = modelName === 'gem' || (gridDef.grid_params.lon_first === 180.0 && gridDef.grid_params.lat_first === -90 && gridDef.grid_params.lon_last === 179.85);
+                
+                if (isGEMType) {
+                    while (adjustedLon < gridOrigin.x) adjustedLon += 360;
+                    x = (adjustedLon - gridOrigin.x) / gridPixelSize.x;
+                    y = (projected.y - gridOrigin.y) / gridPixelSize.y;
+                    return { x, y };
+                }
+
+                let isFlippedGrid = isECMWFType ? true : (gridDef.grid_params.lat_first < (gridDef.grid_params.lat_last || (gridDef.grid_params.ny - 1) * gridDef.grid_params.dy_degrees));
+
+                if (isGFSType) {
+                    adjustedLon = projected.x + 180;
+                } else if (isECMWFType) {
+                    if (adjustedLon < gridOrigin.x) adjustedLon += 360;
+                } else if (['arome1', 'arome25', 'arpegeeu', 'iconeu', 'icond2'].includes(modelName)) {
+                    while (adjustedLon < 0) adjustedLon += 360;
+                    while (adjustedLon >= 360) adjustedLon -= 360;
+                    
+                    x = (adjustedLon >= gridOrigin.x) ? (adjustedLon - gridOrigin.x) / gridPixelSize.x : (adjustedLon + 360 - gridOrigin.x) / gridPixelSize.x;
+                    
+                    if (['arome1', 'arome25', 'arpegeeu'].includes(modelName)) {
+                        y = (gridOrigin.y - projected.y) / Math.abs(gridPixelSize.y);
+                    } else if (['iconeu', 'icond2'].includes(modelName)) {
+                        y = (projected.y - gridOrigin.y) / gridPixelSize.y;
+                    }
+                    return { x, y };
+                } else {
+                    const lonFirst = gridOrigin.x;
+                    if (lonFirst > 180 && adjustedLon < 0) adjustedLon += 360;
+                    else if (lonFirst < 0 && adjustedLon > 180) adjustedLon -= 360;
+                }
+                
+                x = (adjustedLon - gridOrigin.x) / gridPixelSize.x;
+                
+                if (isFlippedGrid) {
+                    if (isECMWFType) {
+                        y = (gridOrigin.y - projected.y) / Math.abs(gridPixelSize.y);
+                    } else {
+                        const maxLat = gridDef.grid_params.lat_last || (gridDef.grid_params.ny - 1) * gridDef.grid_params.dy_degrees;
+                        y = (maxLat - projected.y) / Math.abs(gridPixelSize.y);
+                    }
+                } else {
+                    y = (projected.y - gridOrigin.y) / gridPixelSize.y;
+                }
+            }
+        } else {
+             // For projected systems, origin and pixel size are in projected units
+            const projOrigin = { x: gridDef.grid_params.x_origin, y: gridDef.grid_params.y_origin };
+            const projPixelSize = { x: gridDef.grid_params.dx, y: gridDef.grid_params.dy };
+            x = (projected.x - projOrigin.x) / projPixelSize.x;
+            // The y-axis for projected grids often needs flipping relative to the origin
+            y = (projOrigin.y - projected.y) / Math.abs(projPixelSize.y);
+        }
+        
+        return { x, y };
+    }
+
+    latLonToGridPixelPolarStereographic(lat, lon, gridDef) {
+        // ... (This function remains mostly the same, just uses the passed gridDef)
+        try {
+            const projParams = gridDef.proj_params;
+            let projectionString = `+proj=${projParams.proj}`;
+            Object.keys(projParams).forEach(key => { if (key !== 'proj') projectionString += ` +${key}=${projParams[key]}`; });
+            projectionString += ' +lat_0=90 +no_defs';
+            
+            const wgs84 = 'EPSG:4326';
+            const { nx, ny, dx, dy, x_origin, y_origin } = gridDef.grid_params;
+            
+            const x_min = x_origin;
+            const x_max = x_origin + (nx - 1) * dx;
+            const y_max = y_origin;
+            const y_min = y_origin + (ny - 1) * dy;
+            
+            const [proj_x, proj_y] = proj4(wgs84, projectionString, [lon, lat]);
+            
+            if (!isFinite(proj_x) || !isFinite(proj_y)) return { x: -1, y: -1 };
+            
+            const t_x = (proj_x - x_min) / (x_max - x_min);
+            const t_y = (proj_y - y_max) / (y_min - y_max);
+            
+            const x = t_x * (nx - 1);
+            const y = t_y * (ny - 1);
+            
+            return { x, y };
+        } catch (error) {
+            console.warn(`[GridAccessor] RGEM polar stereographic conversion failed for ${lat}, ${lon}:`, error);
+            return { x: -1, y: -1 };
+        }
+    }
+
     _getGridIndexFromLngLat(lng, lat) {
         const gridModel = this.state.isMRMS ? 'mrms' : this.state.model;
         const gridDef = COORDINATE_CONFIGS[gridModel];
-        if (!gridDef) return null;
-
+        if (!gridDef) {
+            return null;
+        }
         const { nx, ny } = gridDef.grid_params;
-        let i, j;
 
-        if (gridDef.type === 'latlon') {
-            const { lon_first, lat_first, dx_degrees, dy_degrees } = gridDef.grid_params;
+        // Pass the fetched gridDef and modelName to the calculation function
+        const pixelCoords = this.latLonToGridPixel(lat, lng, gridDef, gridModel);
 
-            // --- THIS IS THE FIX for GFS ---
-            // 1. Normalize the mouse longitude from [-180, 180] to the grid's [0, 360] range.
-            let normalizedLng = lng;
-            if (normalizedLng < lon_first) {
-                normalizedLng += 360;
-            }
-
-            // 2. Calculate indices using the normalized longitude.
-            // The latitude calculation is correct because dy_degrees is negative,
-            // naturally handling the grid's top-to-bottom orientation.
-            i = Math.round((normalizedLng - lon_first) / dx_degrees);
-            j = Math.round((lat - lat_first) / dy_degrees);
-            // --- END OF FIX ---
-
-        } else if (gridDef.type === 'lambert_conformal_conic' || gridDef.type === 'polar_stereographic') {
-            // (Leaving other projection logic as is)
-            let projString = Object.entries(gridDef.proj_params).map(([k,v]) => `+${k}=${v}`).join(' ');
-            if(gridDef.type === 'polar_stereographic') projString += ' +lat_0=90';
-            
-            const [proj_x, proj_y] = proj4('EPSG:4326', projString, [lng, lat]);
-            const { x_origin, y_origin, dx, dy } = gridDef.grid_params;
-            i = Math.round((proj_x - x_origin) / dx);
-            j = Math.round((proj_y - y_origin) / dy);
-        } else {
-            return null; // Other projections are not supported for inspection.
+        if (!pixelCoords || !isFinite(pixelCoords.x) || !isFinite(pixelCoords.y) || pixelCoords.x < 0 || pixelCoords.y < 0) {
+            return null;
         }
 
-        // Final check to ensure the calculated indices are within the grid's bounds.
+        const i = Math.round(pixelCoords.x);
+        const j = Math.round(pixelCoords.y);
+
         if (i >= 0 && i < nx && j >= 0 && j < ny) {
             return { i, j };
         }
-        
+
         return null;
     }
 }
