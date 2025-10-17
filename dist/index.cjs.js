@@ -8679,6 +8679,8 @@ class FillLayerManager extends EventEmitter {
         this.customColormaps = options.customColormaps || {};
         this._handleMouseMove = this._handleMouseMove.bind(this);
         this.map.on('mousemove', this._handleMouseMove);
+        this.resultQueue = [];
+        this.isProcessingQueue = false;
         
         const userLayerOptions = options.layerOptions || {};
         const initialVariable = userLayerOptions.variable || null;
@@ -9005,16 +9007,38 @@ class FillLayerManager extends EventEmitter {
         return varInfo?.displayName || varInfo?.name || variableCode;
     }
 
+    _processResultQueue() {
+        // Process all the results that have accumulated since the last frame.
+        while (this.resultQueue.length > 0) {
+            const { success, requestId, decompressedData, encoding, error } = this.resultQueue.shift();
+
+            if (this.workerResolvers.has(requestId)) {
+                const { resolve, reject } = this.workerResolvers.get(requestId);
+                if (success) {
+                    resolve({ data: decompressedData, encoding });
+                } else {
+                    reject(new Error(error));
+                }
+                this.workerResolvers.delete(requestId);
+            }
+        }
+        
+        // Mark processing as finished so it can be scheduled again on the next message.
+        this.isProcessingQueue = false;
+    }
+
     _handleWorkerMessage(e) {
         const { success, requestId, decompressedData, encoding, error } = e.data;
-        if (this.workerResolvers.has(requestId)) {
-            const { resolve, reject } = this.workerResolvers.get(requestId);
-            if (success) {
-                resolve({ data: decompressedData, encoding });
-            } else {
-                reject(new Error(error));
-            }
-            this.workerResolvers.delete(requestId);
+
+        // Add the result (or error) and the original promise resolver to our queue.
+        this.resultQueue.push({ success, requestId, decompressedData, encoding, error });
+
+        // If our processing function isn't already scheduled to run, schedule it now.
+        if (!this.isProcessingQueue) {
+            this.isProcessingQueue = true;
+            // Use requestAnimationFrame to run our processing logic before the next repaint.
+            // This guarantees UI events are not blocked.
+            requestAnimationFrame(() => this._processResultQueue());
         }
     }
     
