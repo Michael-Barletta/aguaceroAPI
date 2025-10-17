@@ -9023,6 +9023,75 @@ class FillLayerManager extends EventEmitter {
         await this.setState({ mrmsTimestamp: timestamp });
     }
 
+    async switchMode(options) {
+        const {
+            mode,
+            variable,
+            model,
+            forecastHour,
+            mrmsTimestamp
+        } = options;
+
+        // --- 1. Basic Validation ---
+        if (!mode || !variable) {
+            console.error("switchMode requires 'mode' ('mrms' | 'model') and 'variable' properties.");
+            return;
+        }
+        if (mode === 'model' && !model) {
+            console.error("switchMode with mode 'model' requires a 'model' property.");
+            return;
+        }
+
+        // --- 2. Construct the Target State ---
+        let targetState = {};
+
+        if (mode === 'mrms') {
+            // Get the latest timestamp if one isn't provided
+            let finalTimestamp = mrmsTimestamp;
+            if (finalTimestamp === undefined) {
+                const sortedTimestamps = [...(this.mrmsStatus[variable] || [])].sort((a, b) => b - a);
+                finalTimestamp = sortedTimestamps.length > 0 ? sortedTimestamps[0] : null;
+            }
+
+            targetState = {
+                isMRMS: true,
+                variable: variable,
+                mrmsTimestamp: finalTimestamp,
+                // Nullify model-specific state to prevent confusion
+                model: this.state.model,
+                date: null,
+                run: null,
+                forecastHour: 0,
+            };
+
+        } else if (mode === 'model') {
+            // Find the latest run for the specified model
+            const latestRun = findLatestModelRun(this.modelStatus, model);
+            if (!latestRun) {
+                console.error(`Could not find a valid run for model: ${model}`);
+                return; // Can't proceed without a valid run
+            }
+
+            targetState = {
+                isMRMS: false,
+                model: model,
+                variable: variable,
+                date: latestRun.date,
+                run: latestRun.run,
+                forecastHour: forecastHour !== undefined ? forecastHour : 0,
+                // Nullify MRMS state
+                mrmsTimestamp: null,
+            };
+        } else {
+            console.error(`Invalid mode specified in switchMode: '${mode}'`);
+            return;
+        }
+
+        // --- 3. Atomically Apply the New State ---
+        // This single call prevents the race condition by applying all changes at once.
+        await this.setState(targetState);
+    }
+
     async initialize(options = {}) {
         await this.fetchModelStatus(true);
         await this.fetchMRMSStatus(true);
