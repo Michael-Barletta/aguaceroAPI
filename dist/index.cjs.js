@@ -9351,8 +9351,27 @@ class FillLayerManager extends EventEmitter {
         return newColormap;
     }
 
+    _normalizeModelName(modelName) {
+        const mapping = {
+            'hrrr': ['mpashn', 'mpasrt', 'mpasht', 'hrrrsub', 'rrfs', 'namnest', 'mpasrn', 'mpasrn3', 'mpasht2'],
+            'arw': ['arw2', 'fv3', 'href'],
+            'rtma': ['nbm'],
+            'ecmwf': ['ecmwfaifs'],
+            'gfs': ['arpege', 'graphcastgfs']
+        };
+
+        for (const [normalized, aliases] of Object.entries(mapping)) {
+            if (aliases.includes(modelName)) {
+                return normalized;
+            }
+        }
+
+        return modelName;
+    }
+
     _getGridCornersAndDef(model) {
-        const gridDef = { ...COORDINATE_CONFIGS[model], modelName: model };
+        const normalizedModel = this._normalizeModelName(model);
+        const gridDef = { ...COORDINATE_CONFIGS[normalizedModel], modelName: model };
         if (!gridDef) return null;
 
         const { nx, ny } = gridDef.grid_params;
@@ -9478,106 +9497,12 @@ class FillLayerManager extends EventEmitter {
         }
     }
 
-/**
-     * Handles the map's mousemove event to inspect data values under the cursor.
-     * @param {object} e - The Mapbox GL mouse event object.
-     * @private
-     */
-async _handleMouseMove(e) {
-        const { lng, lat } = e.lngLat;
-        const { variable, isMRMS, mrmsTimestamp, model, date, run, forecastHour, units } = this.state;
-
-        if (!variable) {
-            this.emit('data:inspect', null);
-            return;
-        }
-
-        const gridIndices = this._getGridIndexFromLngLat(lng, lat);
-        if (!gridIndices) {
-            this.emit('data:inspect', null);
-            return;
-        }
-
-        const { i, j } = gridIndices;
-        const gridModel = isMRMS ? 'mrms' : model;
-        const { nx } = COORDINATE_CONFIGS[gridModel].grid_params;
-
-        // VVVV --- THIS IS THE FIX --- VVVV
-        // Corrected the typo from "customColomaps" to "customColormaps"
-        const customSettings = this.customColormaps[variable];
-        // ^^^^ --- END OF FIX --- ^^^^
-
-        const effectiveSmoothing = (customSettings && typeof customSettings.smoothing === 'number') ? customSettings.smoothing : 0;
-        
-        const dataUrlIdentifier = isMRMS
-            ? `mrms-${mrmsTimestamp}-${variable}-${effectiveSmoothing}`
-            : `${model}-${date}-${run}-${forecastHour}-${variable}-${effectiveSmoothing}`;
-
-        const gridDataPromise = this.dataCache.get(dataUrlIdentifier);
-        if (!gridDataPromise) {
-            this.emit('data:inspect', null);
-            return;
-        }
-
-        try {
-            const gridData = await gridDataPromise;
-            if (!gridData || !gridData.data) {
-                this.emit('data:inspect', null);
-                return;
-            }
-
-            // Get the raw byte value (0-255) that was sent to the texture.
-            const index1D = j * nx + i;
-            const byteValue = gridData.data[index1D];
-
-            // Reverse the texture transformation (value + 128) to get the original signed quantized value.
-            const signedQuantizedValue = byteValue - 128;
-
-            // Get the precise scale and offset from the data's encoding metadata.
-            const { scale, offset, missing_quantized } = gridData.encoding;
-
-            // Check if the value is the designated "missing" value.
-            if (signedQuantizedValue === missing_quantized) {
-                this.emit('data:inspect', null);
-                return;
-            }
-
-            // Dequantize to get the true, unscaled physical value.
-            const nativeValue = signedQuantizedValue * scale + offset;
-
-            // Get the base unit from the variable's dictionary or colormap.
-            const { baseUnit } = this._getColormapForVariable(variable);
-            let dataNativeUnit = baseUnit || (DICTIONARIES.fld[variable] || {}).defaultUnit || 'none';
-            
-            const displayUnit = this._getTargetUnit(dataNativeUnit, units);
-            const conversionFunc = getUnitConversionFunction(dataNativeUnit, displayUnit);
-            const displayValue = conversionFunc ? conversionFunc(nativeValue) : nativeValue;
-
-            this.emit('data:inspect', {
-                lngLat: e.lngLat,
-                point: e.point,
-                variable: {
-                    code: variable,
-                    name: this.getVariableDisplayName(variable),
-                },
-                value: displayValue,
-                unit: displayUnit,
-            });
-
-        } catch (error) {
-            this.emit('data:inspect', null);
-        }
-    }
-// (Keep all of your existing code from the top of the file down to _handleMouseMove)
-// ...
-
    /**
      * Handles the map's mousemove event to inspect data values under the cursor.
      * @param {object} e - The Mapbox GL mouse event object.
      * @private
      */
     async _handleMouseMove(e) {
-        // ... (this function remains unchanged)
         const { lng, lat } = e.lngLat;
         const { variable, isMRMS, mrmsTimestamp, model, date, run, forecastHour, units } = this.state;
 
@@ -9594,7 +9519,8 @@ async _handleMouseMove(e) {
 
         const { i, j } = gridIndices;
         const gridModel = isMRMS ? 'mrms' : model;
-        const { nx } = COORDINATE_CONFIGS[gridModel].grid_params;
+        const normalizedGridModel = this._normalizeModelName(gridModel);
+        const { nx } = COORDINATE_CONFIGS[normalizedGridModel].grid_params;
 
         const customSettings = this.customColormaps[variable];
         const effectiveSmoothing = (customSettings && typeof customSettings.smoothing === 'number') ? customSettings.smoothing : 0;
@@ -9788,10 +9714,11 @@ async _handleMouseMove(e) {
             return { x: -1, y: -1 };
         }
     }
-
+    
     _getGridIndexFromLngLat(lng, lat) {
         const gridModel = this.state.isMRMS ? 'mrms' : this.state.model;
-        const gridDef = COORDINATE_CONFIGS[gridModel];
+        const normalizedGridModel = this._normalizeModelName(gridModel);
+        const gridDef = COORDINATE_CONFIGS[normalizedGridModel];
         if (!gridDef) {
             return null;
         }
